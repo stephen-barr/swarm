@@ -1,0 +1,7 @@
+name: sheaf_metric
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - gtsam
+prefix: /opt/homebrew/Caskroom/miniconda/base/envs/sheaf_metric
