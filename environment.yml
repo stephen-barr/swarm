@@ -1,4 +1,4 @@
-name: sheaf_metric
+name: swarm-detectability
 channels:
   - defaults
 dependencies:
