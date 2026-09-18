@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "swarm-detectability"
+name = "swarm"
 version = "0.1.0"
-description = "Detectability analysis for heterogeneous multi-agent estimation"
+description = "Auction-based task allocation for heterogeneous drone swarms"
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
@@ -13,5 +13,8 @@ dependencies = [
     "matplotlib",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+py-modules = ["agent"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
