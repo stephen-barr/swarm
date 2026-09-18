@@ -5,3 +5,12 @@ __pycache__/
 .env
 data/raw/
 *.npz
+
+# Editor / tooling
+tempCodeRunnerFile.*
+
+# Data and outputs
+data/
+*.png
+results/*
+!results/.gitkeep

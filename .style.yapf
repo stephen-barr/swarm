@@ -1,0 +1,3 @@
+[style]
+based_on_style = pep8
+SPACES_BEFORE_COMMENT = 35, 45, 55
