@@ -2,17 +2,17 @@ import random
 
 import pytest
 
-from agent import (
+from simulation.simulation import run_auction
+from swarm.agent import (
     Agent,
     AgentConfig,
     Target,
     buildSlots,
     group_slots,
     index_targets,
-    run_auction,
 )
-from distributed_comm import Channel
-from models import (
+from swarm.comms import Channel
+from swarm.models import (
     Capability,
     Covariance,
     Frame,

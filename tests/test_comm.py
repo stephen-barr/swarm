@@ -1,6 +1,6 @@
 import pytest
 
-from distributed_comm import Channel
+from swarm.comms import Channel
 
 LINE = {0: [1], 1: [0, 2], 2: [1]}          # 0 — 1 — 2
 COMPLETE = {0: [1, 2], 1: [0, 2], 2: [0, 1]}
