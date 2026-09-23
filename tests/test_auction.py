@@ -2,7 +2,6 @@ import random
 
 import pytest
 
-from simulation.simulation import run_auction
 from swarm.agent import (
     Agent,
     AgentConfig,
@@ -11,6 +10,7 @@ from swarm.agent import (
     group_slots,
     index_targets,
 )
+from swarm.auction import run_auction
 from swarm.comms import Channel
 from swarm.models import (
     Capability,
