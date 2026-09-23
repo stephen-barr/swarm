@@ -1,7 +1,0 @@
-{
-    "python.defaultInterpreterPath": "/opt/homebrew/Caskroom/miniconda/base/bin/python",
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": ["."],
-    "python.testing.cwd": "${workspaceFolder}",
-    "python-envs.pythonProjects": []
-}
