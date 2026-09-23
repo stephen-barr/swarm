@@ -5,3 +5,4 @@ dependencies:
   - python=3.11
   - gtsam
 prefix: /opt/homebrew/Caskroom/miniconda/base/envs/sheaf_metric
+[tool.coverage.run]
