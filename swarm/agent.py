@@ -4,6 +4,8 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from swarm.models import (
     LOSES_TO_ALL,
     Capability,
@@ -31,6 +33,7 @@ class Target:
     target_id: int                                        # id for target
     target_position: PositionEstimate                     # position estimate of target
     threat_level: float                                   # how dangerous is this target to my side
+    threat_char_time: float                               # time in seconds for the value of a target to half
     requirement_distribution: dict[
         Role,
         CountDistribution]                                # what is the estimated probability you need any number of a certain class of drones
@@ -74,11 +77,14 @@ class Agent:
 
     def makeScore(
         self, target: Target
-    ) -> float:                                            # build a naive weight based on threat level and time to arrival
+    ) -> float:                                        # build a naive weight based on threat level and time to arrival
         dist = math.dist(self.agent_position.position,
                          target.target_position.position)
         time_to_arrival = dist / self.config.cruise_speed
-        return target.threat_level * 100 - time_to_arrival # just a naive weight
+        score = target.threat_level * np.exp(
+            -time_to_arrival / target.threat_char_time)
+        return score
+                                                       ### A target is only worth reaching within threat_level × 100 seconds
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],
             targets_by_id: dict[int, Target]) -> dict[Slot, float]:

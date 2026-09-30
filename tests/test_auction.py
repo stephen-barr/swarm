@@ -24,6 +24,7 @@ from swarm.models import (
 
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)
+CHAR_TIME = 60.0        # seconds; shared by every test target
 
 A = Capability.SURVEILLANCE
 B = Capability.MAPPING
@@ -41,6 +42,10 @@ def make_agent(agent_id, capabilities, x, y, speed=12.0):
                     frozenset(capabilities), speed),
         at(x, y),
     )
+
+
+def make_target(target_id, position, threat, requirements):
+    return Target(target_id, position, threat, CHAR_TIME, requirements)
 
 
 def complete_graph(ids):
@@ -71,6 +76,7 @@ def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
             target_id=t,
             target_position=at(rng.uniform(-500, 500), rng.uniform(-500, 500)),
             threat_level=rng.uniform(0.1, 1.0),
+            threat_char_time=CHAR_TIME,
             requirement_distribution={
                 role(*rng.sample(caps, rng.randint(1, max_role_size))): {
                     n: 1.0 / 3
@@ -92,7 +98,11 @@ def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
 
 
 def test_no_eligible_agent_leaves_slot_open():
-    targets = [Target(0, at(100, 0), 0.5, {role(Capability.STRIKE): {1: 1.0}})]
+    targets = [
+        make_target(0, at(100, 0), 0.5, {role(Capability.STRIKE): {
+                                             1: 1.0
+                                         }})
+    ]
     agents = [make_agent(0, {A}, 0, 0)]
     solve(agents, targets)
     assert agents[0].slot is None
@@ -100,7 +110,7 @@ def test_no_eligible_agent_leaves_slot_open():
 
 
 def test_closer_agent_wins_the_only_slot():
-    targets = [Target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
+    targets = [make_target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
     agents = [make_agent(0, {A}, 10, 0), make_agent(1, {A}, 400, 0)]
     solve(agents, targets)
     assert agents[0].slot is not None
@@ -109,7 +119,7 @@ def test_closer_agent_wins_the_only_slot():
 
 def test_identical_agents_both_assigned():
     """Tie-breaking: two identical agents, two identical slots."""
-    targets = [Target(0, at(100, 0), 0.5, {role(A): {2: 1.0}})]
+    targets = [make_target(0, at(100, 0), 0.5, {role(A): {2: 1.0}})]
     agents = [make_agent(0, {A}, 0, 0), make_agent(1, {A}, 0, 0)]
     solve(agents, targets)
     assert agents[0].slot is not None
@@ -118,7 +128,7 @@ def test_identical_agents_both_assigned():
 
 
 def test_mostlikely_picks_by_probability_not_key_order():
-    t = Target(0, at(0, 0), 0.5, {role(B): {3: 0.1, 1: 0.7, 2: 0.2}})
+    t = make_target(0, at(0, 0), 0.5, {role(B): {3: 0.1, 1: 0.7, 2: 0.2}})
     assert t.mostLikely() == {role(B): 1}
 
 
@@ -126,12 +136,12 @@ def test_mostlikely_picks_by_probability_not_key_order():
 
 
 def test_combined_role_needs_one_drone_with_both():
-    targets = [Target(0, at(100, 0), 0.5, {role(A, B): {1: 1.0}})]
+    targets = [make_target(0, at(100, 0), 0.5, {role(A, B): {1: 1.0}})]
     agents = [
         make_agent(0, {A}, 0, 0),
         make_agent(1, {B}, 0, 0),
-        make_agent(2, {A, B}, 300, 0)
-    ]                                       # farthest, but the only one eligible
+        make_agent(2, {A, B}, 300, 0),      # farthest, but the only one eligible
+    ]
     solve(agents, targets)
     assert agents[2].slot is not None
     assert agents[0].slot is None
@@ -140,13 +150,13 @@ def test_combined_role_needs_one_drone_with_both():
 
 def test_separate_roles_filled_by_separate_drones():
     targets = [
-        Target(0, at(100, 0), 0.5, {
+        make_target(0, at(100, 0), 0.5, {
             role(A): {
                 1: 1.0
             },
             role(B): {
                 1: 1.0
-            }
+            },
         })
     ]
     agents = [make_agent(0, {A}, 0, 0), make_agent(1, {B}, 0, 0)]
@@ -156,7 +166,7 @@ def test_separate_roles_filled_by_separate_drones():
 
 
 def test_multi_capable_drone_fills_single_role():
-    targets = [Target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
+    targets = [make_target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
     agents = [make_agent(0, {A, B}, 0, 0)]
     solve(agents, targets)
     assert agents[0].slot is not None
@@ -166,7 +176,7 @@ def test_multi_capable_drone_fills_single_role():
 
 
 def test_line_graph_matches_complete_graph_on_simple_case():
-    targets = [Target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
+    targets = [make_target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})]
     near = [make_agent(i, {A}, x, 0) for i, x in enumerate((10, 200, 400))]
     far = [make_agent(i, {A}, x, 0) for i, x in enumerate((10, 200, 400))]
     solve(near, targets, complete_graph)
