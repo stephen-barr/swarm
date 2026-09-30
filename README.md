@@ -25,7 +25,9 @@ $$\text{score} = V \cdot e^{-t/\tau}$$
 - V sets how high a target's curve starts; τ sets how quickly it falls.
 - Curves can cross: an urgent, valuable target (V = 80, τ = 30 s) becomes worth less than a patient, modest one (V = 30, τ = 90 s) after about 44 s of travel. Nearby drones prefer the first; distant ones, the second.
 
-![Time-discounted value curves](docs/figures/discounted_value.png)
+<img width="1219" height="785" alt="discounted_value" src="https://github.com/user-attachments/assets/c38e5a39-c8dc-48a5-a211-bc649c20e1c6" />
+
+
 
 **Notes**
 
