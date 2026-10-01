@@ -11,8 +11,10 @@ from swarm.agent import (
     index_targets,
 )
 from swarm.auction import run_auction
+from swarm.baselines import solveHungarian
 from swarm.comms import Channel
 from swarm.models import (
+    AuctionResult,
     Capability,
     Covariance,
     Frame,
@@ -61,7 +63,7 @@ def ring_graph(ids):
     return edges_to_topology(ring_edges(len(ids)))
 
 
-def solve(agents, targets, graph=complete_graph) -> int:
+def solve(agents, targets, graph=complete_graph) -> AuctionResult:
     """Run a distributed auction; return the number of rounds."""
     ids = [a.config.agent_id for a in agents]
     channel = Channel(graph(ids))
@@ -216,9 +218,9 @@ def test_assignments_respect_capabilities(seed, role_size, graph):
 @pytest.mark.parametrize("seed", range(50))
 def test_terminates(seed, graph):
     agents, targets = random_instance(seed)
-    rounds = solve(agents, targets,
-                   graph)                   # run_auction raises if it doesn't converge
-    assert rounds < 200, f"slow convergence, seed={seed}"
+    solution = solve(agents, targets,
+                     graph)                 # run_auction raises if it doesn't converge
+    assert solution.rounds < 200, f"slow convergence, seed={seed}"
 
 
 @pytest.mark.parametrize("graph", GRAPHS)
@@ -249,3 +251,15 @@ def test_deterministic(seed):
     solve(a1, t1)
     solve(a2, t2)
     assert [a.slot for a in a1] == [a.slot for a in a2], f"seed={seed}"
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("seed", range(50))
+def test_distributed_to_hungarian(seed, graph):
+    agents, targets = random_instance(seed)
+    distr_auction_result = solve(agents, targets, graph)
+    hung_total, _ = solveHungarian(agents,
+                                   slots=buildSlots(targets),
+                                   targets_by_id=index_targets(targets))
+    assert distr_auction_result.total <= hung_total + 1e-6
+    assert hung_total / 2 <= distr_auction_result.total
