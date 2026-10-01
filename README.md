@@ -34,3 +34,6 @@ $$\text{score} = V \cdot e^{-t/\tau}$$
 
 - The optimal (Hungarian) baseline uses the same score function, so gaps between it and the auction are comparable.
 - Results depend on τ, which is recorded with every experiment.
+
+
+All rights are reserved.
