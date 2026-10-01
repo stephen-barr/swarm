@@ -14,7 +14,7 @@ class Frame(Enum):
 
 @dataclass(frozen=True)
 class PositionEstimate:
-    frame: Frame                            # either frame or odometry
+    frame: Frame                            # global or local
     position: ThreeVector                   # position in (x,y,z)
     velocity: ThreeVector                   # Euclidean velocity
     position_covariance: Covariance         # covariance matrix
@@ -82,6 +82,15 @@ class Message:
     @property
     def deliveryStep(self) -> int:
         return self.send_step + self.message_delay    # using contant delayed model for now
+
+
+@dataclass(frozen=True)
+class AuctionResult:
+    rounds: int
+    winners: Winners                        # the agreed table
+    assignment: dict[int, Slot | None]      # agent_id -> slot
+    total: float
+    filled: int
 
 
 MessagesById = dict[int, list[Message]]               # {agent id : [Messages]}
