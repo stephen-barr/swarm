@@ -16,8 +16,6 @@ from swarm.models import (
     Frame,
     PlatformClass,
     PositionEstimate,
-    Role,
-    Slot,
     ThreeVector,
     role,
 )
@@ -36,6 +34,7 @@ def main() -> None:
             target_id=0,
             target_position=at(100.0, 0.0),
             threat_level=0.8,
+            threat_char_time=60.0,
             requirement_distribution={
                 role(Capability.SURVEILLANCE): {
                     1: 0.2,
@@ -48,6 +47,7 @@ def main() -> None:
             target_id=1,
             target_position=at(0.0, 400.0),
             threat_level=0.3,
+            threat_char_time=60.0,
             requirement_distribution={
                 role(Capability.SURVEILLANCE): {
                     1: 0.9,

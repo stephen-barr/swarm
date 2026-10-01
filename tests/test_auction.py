@@ -21,6 +21,7 @@ from swarm.models import (
     ThreeVector,
     role,
 )
+from swarm.scenarios import complete_edges, edges_to_topology, line_edges, ring_edges
 
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)
@@ -49,15 +50,15 @@ def make_target(target_id, position, threat, requirements):
 
 
 def complete_graph(ids):
-    return {i: [j for j in ids if j != i] for i in ids}
+    return edges_to_topology(complete_edges(len(ids)))
 
 
 def line_graph(ids):
-    ids = sorted(ids)
-    return {
-        ids[k]: [ids[j] for j in (k - 1, k + 1) if 0 <= j < len(ids)]
-        for k in range(len(ids))
-    }
+    return edges_to_topology(line_edges(len(ids)))
+
+
+def ring_graph(ids):
+    return edges_to_topology(ring_edges(len(ids)))
 
 
 def solve(agents, targets, graph=complete_graph) -> int:
@@ -186,7 +187,7 @@ def test_line_graph_matches_complete_graph_on_simple_case():
 
 # ---- properties over random instances ----
 
-GRAPHS = [complete_graph, line_graph]
+GRAPHS = [complete_graph, line_graph, ring_graph]
 ROLE_SIZES = [1, 2]
 
 
