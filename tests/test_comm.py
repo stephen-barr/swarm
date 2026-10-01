@@ -3,9 +3,9 @@ import pytest
 from swarm.comms import Channel
 from swarm.scenarios import complete_edges, edges_to_topology, line_edges, ring_edges
 
-LINE = (edges_to_topology(5, line_edges(5)))
-COMPLETE = (edges_to_topology(5, complete_edges(5)))
-RING = (edges_to_topology(5, ring_edges(5)))
+LINE = (edges_to_topology(line_edges(5)))
+COMPLETE = (edges_to_topology(complete_edges(5)))
+RING = (edges_to_topology(ring_edges(5)))
 
 
 def test_broadcast_reaches_only_neighbours():
@@ -27,7 +27,7 @@ def test_broadcast_reaches_all_neighbours():
 
 
 def test_sender_does_not_hear_itself():
-    ch = Channel(edges_to_topology(3, complete_edges(3)))
+    ch = Channel(edges_to_topology(complete_edges(3)))
     ch.beginStep(1)
     ch.transmitMessage(0, {"from": 0})
     assert ch.deliverMessage(0) == []
@@ -57,7 +57,7 @@ def test_payload_is_copied():
 
 
 def test_multiple_senders_accumulate():
-    ch = Channel(edges_to_topology(3, line_edges(3)))
+    ch = Channel(edges_to_topology(line_edges(3)))
     ch.beginStep(1)
     ch.transmitMessage(0, {"from": 0})
     ch.transmitMessage(2, {"from": 2})
@@ -68,7 +68,7 @@ def test_multiple_senders_accumulate():
 
 
 def test_delivery_order_is_deterministic():
-    ch = Channel(edges_to_topology(3, line_edges(3)))
+    ch = Channel(edges_to_topology(line_edges(3)))
     ch.beginStep(1)
     ch.transmitMessage(2, {"from": 2})      # sent second-lowest id first
     ch.transmitMessage(0, {"from": 0})
