@@ -13,8 +13,9 @@ dependencies = [
     "matplotlib",
 ]
 
-[tool.setuptools]
-py-modules = ["agent"]
+[tool.setuptools.packages.find]
+include = ["swarm*"]
+namespaces = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
