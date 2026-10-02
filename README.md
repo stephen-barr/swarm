@@ -1,4 +1,4 @@
-# Consensus-Based Decentralized Auctions for Heterogenous Drone Swarms
+# Consensus-Based Decentralized Auctions for Heterogeneous Drone Swarms
 [![tests](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml/badge.svg)](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml)
 
 This is a from-scratch Python implementation of decentralized task allocation for a heterogeneous drone swarm. The fundamental problem it aims to solve is as follows:
@@ -13,7 +13,7 @@ Such a question is of broad interest to the field of autonomous systems. Conside
 
 Currently this project implements decentralized single-assignment auctions (CBAA) with multi-capability roles, checked against the optimal assignment found through a Hungarian algorithm.
 
-I aim to incrementally add uncertainty to a working implementation of the the standard consensus auction algorithm.
+I aim to incrementally add uncertainty to a working implementation of the standard consensus auction algorithm.
 
 1. **Single assignment (CBAA): done.** Everything is known and fixed: tasks, demand, and a reliable, synchronous network.
 2. **Bundles (CBBA): next.** Not yet introducing uncertainty. Agents are assigned ordered lists of targets instead of a single assignment. Coalitions in the CBBA line are built on bundles, so this comes first.
@@ -49,7 +49,7 @@ $$\text{score} = V \cdot e^{-t/\tau}$$
 **Behaviour**
 
 - V sets how high a target's curve starts; τ sets how quickly it falls.
-- Curves can cross: an urgent, valuable target (V = 80, τ = 30 s) becomes worth less than a patient, modest one (V = 30, τ = 90 s) after about 44 s of travel. Nearby drones prefer the first; distant ones, the second.
+- Curves can cross: an urgent, valuable target (V = 0.8, τ = 30 s) becomes worth less than a patient, modest one (V = 0.3, τ = 90 s) after about 44 s of travel. Nearby drones prefer the first; distant ones, the second.
 
 <p align="center">
 <img width="610" alt="discounted_value" src="https://github.com/user-attachments/assets/c38e5a39-c8dc-48a5-a211-bc649c20e1c6" />
