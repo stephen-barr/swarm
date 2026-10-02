@@ -3,7 +3,7 @@ from swarm.comms import Channel
 from swarm.models import AuctionResult, Role, Slot, Winners
 
 
-def run_round(t, agents: list[Agent], channel: Channel, slots_by_role,
+def run_round(t: int, agents: list[Agent], channel: Channel, slots_by_role,
               targets_by_id) -> None:
     """All agents bid, then all send, then all receive.
     Each phase happens in the same time period for every agent, so message 
@@ -19,7 +19,10 @@ def run_round(t, agents: list[Agent], channel: Channel, slots_by_role,
     channel.endStep()
 
 
-def auctionTotal(winners: Winners) -> tuple[float, int]:
+def auctionTotal(
+    winners: Winners
+) -> tuple[float,
+           int]:        # Returns (sum of winning scores, number of slots filled)
     return sum((score for score, _ in winners.values())), len(winners)
 
 
@@ -44,13 +47,9 @@ def run_auction(agents: list[Agent],
         max_rounds: Safety cap. Convergence normally takes at most
             (number of slots) x (network diameter) rounds.
 
-    Returns:
-        AuctionResult with the agreed winners table, each agent's slot,
+    Returns: AuctionResult with the agreed winners table, each agent's slot,
         the total score, the number of slots filled, and the rounds taken.
-
-    Raises:
-        RuntimeError: If tables are still changing after max_rounds. Usually
-            a bug (e.g. inconsistent tie-breaking) or a disconnected graph.
+    Raises: RuntimeError: If tables are still changing after max_rounds.
     """
 
     for t in range(1, max_rounds + 1):

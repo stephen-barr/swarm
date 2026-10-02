@@ -25,9 +25,7 @@ from swarm.models import (
 )
 
 
-def line_edges(
-    n
-) -> tuple[int, list[tuple[int, int]]]:     # returns a dict of sender -> receiver
+def line_edges(n) -> tuple[int, list[tuple[int, int]]]:
     return n, [(i, i + 1) for i in range(n - 1)]
 
 
@@ -107,7 +105,9 @@ def ring_graph(ids):
 
 
 def solve(agents, targets, graph=complete_graph) -> AuctionResult:
-    """Run a distributed auction; return the number of rounds."""
+    """
+    Run a distributed auction on a complete graph. Return an AuctionResult object.
+    """
     ids = [a.config.agent_id for a in agents]
     channel = Channel(graph(ids))
     return run_auction(agents, channel, group_slots(buildSlots(targets)),
@@ -115,6 +115,16 @@ def solve(agents, targets, graph=complete_graph) -> AuctionResult:
 
 
 def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
+    """
+    Build a random set of agents and targets for testing.
+
+    Agents and targets are placed uniformly in a 1000 x 1000 square centered
+    at the origin. Each agent gets 1-3 random capabilities. Each target needs
+    1-3 roles, each made of up to max_role_size capabilities, with random (unnormalized)
+    weights over needing 1, 2, or 3 agents. The same seed always gives
+    the same instance. Note the random weights will need to be fixed.
+    """
+
     rng = random.Random(seed)
     caps = list(Capability)
     targets = [

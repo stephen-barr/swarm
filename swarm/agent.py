@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -35,19 +35,23 @@ class AgentConfig:
 
 @dataclass
 class Target:
-    target_id: int                                        # id for target
-    target_position: PositionEstimate                     # position estimate of target
-    threat_level: float                                   # how dangerous is this target to my side
-    threat_char_time: float                               # time in seconds for the value V of a target to be V/e.
+    target_id: int                          # id for target
+    target_position: PositionEstimate       # position estimate of target
+    threat_level: float                     # how dangerous is this target to my side
+    threat_char_time: float                 # time in seconds for the value V of a target to be V/e.
     requirement_distribution: dict[
         Role,
-        CountDistribution]                                # what is the estimated probability you need any number of a certain class of drones
-    agent_winners: dict[Slot, tuple[float, int]] = field(
-        default_factory=dict, init=False)                 # who is assigned to this target
+        CountDistribution]                  # what is the estimated probability you need any number of a certain class of drones
 
     def mostLikely(self) -> dict[Role, int]:
+        """
+        Function takes in a requirement distribution and naively returns the mode.
+        Slots must be integer valued, expectation would return float. The tie 
+        breaker is the greater number. To be replaced when incorporating bayesian
+        model.
+        """
         most_likely = {
-            role_: max(distribution, key=lambda n: distribution[n])
+            role_: max(distribution, key=lambda n: (distribution[n], n))
             for role_, distribution in self.requirement_distribution.items()
         }                                                                    # return a dict of the mode of the needs per capability of a distribution
         return most_likely
@@ -110,24 +114,24 @@ class Agent:
             if required <= self.config.capabilities for s in role_slots
         }
 
-### Only consider slots that are not filled OR slots that agent can win.
-
     def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
                      targets_by_id: dict[int, Target]) -> None:
         if self.slot is not None:
-            return                                                           # already assigned
+            return                                                          # already assigned
         bids = self.bid(slots_by_role, targets_by_id)
         contenders: dict[Slot, float] = {
             s: score
-            for s, score in bids.items() if s not in self.winners or beats((
-                score, self.config.agent_id), self.winners[s])
+            for s, score in bids.items() if s not in self.winners or beats(
+                (                                                           # only consider slots that are not filled
+                    score, self.config.agent_id),
+                self.winners[s])                                            # OR slots that agent can win.
         }
         if not contenders:
-            return                                                           # no assignments for the agent
+            return                                                          # no assignments for the agent
 
         best_slot: Slot = max(
             contenders, key=lambda s: (contenders[s], s.target_id, s.rank)
-        )                                                                  # take the max of all of the slots by score, then by highest target_id
+        )                                                                  # best slot by score; ties go to the higher target_id, then the higher rank
         self.winners[best_slot] = (
             contenders[best_slot], self.config.agent_id
         )                                                                  # write the agent as the winner to the best slot

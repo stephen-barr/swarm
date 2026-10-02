@@ -26,7 +26,7 @@ class PositionEstimate:
     """
     frame: Frame                            # global or local
     position: ThreeVector                   # position in (x,y,z)
-    velocity: ThreeVector                   # Euclidean velocity, not used yet, will be used when postion covariance
+    velocity: ThreeVector                   # Euclidean velocity, not used yet, will be used when postion covariance added
     position_covariance: Covariance         # covariance matrix
 
 
@@ -96,8 +96,8 @@ class Message:
     """
     Message is written by a single drone with a payload of Winners.
 
-    deliveryStep is a method, so the switch from asynchronous to
-    synchronous happens in one place.
+    deliveryStep is a property, so the switch from synchronous to
+    asynchronous happens in one place.
     """
     send_id: int
     receiver_id: int

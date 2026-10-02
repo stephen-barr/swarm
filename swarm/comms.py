@@ -16,7 +16,7 @@ class Channel:
 
     message_delay: rounds between sending and delivery (0 = same round).
     Messages are delivered sorted by (sender, send_step) so runs are
-    deterministic. end_step asserts every deliverable message was communicated,
+    deterministic. endStep asserts every deliverable message was communicated,
     catching an agent that skipped its receive phase.
     """
 
@@ -43,7 +43,7 @@ class Channel:
 
     def deliverMessage(self, recipient_id: int) -> list[Message]:
         box: list[Message] = self.mailbox[
-            recipient_id]                                      # get the messages for the recipent
+            recipient_id]                                      # get the messages for the recipient
         current_messages: list[Message] = [
             m for m in box if m.deliveryStep <= self.time_step
         ]                                                      # only give out the current messages

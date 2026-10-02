@@ -31,12 +31,12 @@ def solveHungarian(agents: list[Agent],
     for i, agent in enumerate(agents):
         for j, slot in enumerate(slots):
             if agent.config.capabilities >= slot.required:
-                m[i, j] = agent.makeScore(targets_by_id[slot.target_id])
+                m[i, j] = agent.makeScore(targets_by_id[
+                    slot.target_id])                     # make score if pairing is eligible
     agent_assignment, slot_assignment = linear_sum_assignment(m, maximize=True)
 
-    # calculate the score for the
     chosen = m[agent_assignment,
                slot_assignment]             # create an array of only the assigned scores
-    real = chosen[chosen > 0]               # boolean mask away any that are unnassigned
+    real = chosen[chosen > 0]               # boolean mask away any that are unassigned
     return float(real.sum()), int(
         real.size)                          # returns (score, number of filled entries)
