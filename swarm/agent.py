@@ -1,3 +1,9 @@
+"""
+One agent's auction methods.
+Only uses agent's position (to make a score) and winners table (to bid).
+
+"""
+
 from __future__ import annotations
 
 import math
@@ -25,7 +31,6 @@ class AgentConfig:
     agent_id: int                           # id for agent
     platform: PlatformClass                 # what platform is the agent
     capabilities: frozenset[Capability]     # what capabilities does the agent have
-    cruise_speed: float                     # how fast is the agent
 
 
 @dataclass
@@ -33,7 +38,7 @@ class Target:
     target_id: int                                        # id for target
     target_position: PositionEstimate                     # position estimate of target
     threat_level: float                                   # how dangerous is this target to my side
-    threat_char_time: float                               # time in seconds for the value of a target to
+    threat_char_time: float                               # time in seconds for the value V of a target to be V/e.
     requirement_distribution: dict[
         Role,
         CountDistribution]                                # what is the estimated probability you need any number of a certain class of drones
@@ -44,7 +49,7 @@ class Target:
         most_likely = {
             role_: max(distribution, key=lambda n: distribution[n])
             for role_, distribution in self.requirement_distribution.items()
-        }                                                                    # return a dict of the expected needs per capability of a distribution
+        }                                                                    # return a dict of the mode of the needs per capability of a distribution
         return most_likely
 
 
@@ -82,13 +87,13 @@ class Agent:
 
     def makeScore(
         self, target: Target
-    ) -> float:                                        # build a naive weight based on threat level and time to arrival
+    ) -> float:                                                          # build a naive weight based on threat level and time to arrival
         dist = math.dist(self.agent_position.position,
                          target.target_position.position)
-        time_to_arrival = dist / self.config.cruise_speed
+        time_to_arrival = dist / self.config.platform.value.cruise_speed # return the estimated time for the agent to arrive at target
         score = target.threat_level * np.exp(
             -time_to_arrival / target.threat_char_time
-        )                                              # use exponential model to lower score as t increases
+        )                                                                # use exponential model to lower score as t increases
         return score
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],

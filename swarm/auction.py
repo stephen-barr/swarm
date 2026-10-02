@@ -3,7 +3,7 @@ from swarm.comms import Channel
 from swarm.models import AuctionResult, Role, Slot, Winners
 
 
-def run_round(t, agents: list[Agent], channel: Channel, slots_by_capability,
+def run_round(t, agents: list[Agent], channel: Channel, slots_by_role,
               targets_by_id) -> None:
     """All agents bid, then all send, then all receive.
     Each phase happens in the same time period for every agent, so message 
@@ -11,7 +11,7 @@ def run_round(t, agents: list[Agent], channel: Channel, slots_by_capability,
     """
     channel.beginStep(t)
     for a in agents:
-        a.auctionPhase(slots_by_capability, targets_by_id)
+        a.auctionPhase(slots_by_role, targets_by_id)
     for a in agents:
         channel.transmitMessage(a.config.agent_id, a.outgoing())
     for a in agents:
@@ -25,7 +25,7 @@ def auctionTotal(winners: Winners) -> tuple[float, int]:
 
 def run_auction(agents: list[Agent],
                 channel: Channel,
-                slots_by_capability: dict[Role, list[Slot]],
+                slots_by_role: dict[Role, list[Slot]],
                 targets_by_id: dict[int, Target],
                 max_rounds=200) -> AuctionResult:
     """
@@ -55,7 +55,7 @@ def run_auction(agents: list[Agent],
 
     for t in range(1, max_rounds + 1):
         before = [dict(a.winners) for a in agents]
-        run_round(t, agents, channel, slots_by_capability, targets_by_id)
+        run_round(t, agents, channel, slots_by_role, targets_by_id)
         if all(a.winners == b for a, b in zip(
                 agents, before)):                        # no changes were made this round
             slots_by_id = {a.config.agent_id: a.slot for a in agents}

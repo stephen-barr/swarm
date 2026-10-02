@@ -3,18 +3,19 @@ import random
 
 import pytest
 
-from swarm.agent import Agent, AgentConfig, Target, buildSlots, index_targets
+from swarm.agent import (
+    buildSlots,
+    index_targets,
+)
 from swarm.auction import auctionTotal
 from swarm.baselines import solveHungarian
 from swarm.models import (
     Capability,
     Covariance,
-    Frame,
-    PlatformClass,
-    PositionEstimate,
     ThreeVector,
     role,
 )
+from swarm.scenarios import at, make_agent, make_target
 
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)
@@ -22,24 +23,6 @@ CHAR_TIME = 60.0
 
 S = Capability.SURVEILLANCE
 M = Capability.MAPPING
-
-# ---- helpers ----
-
-
-def at(x: float, y: float) -> PositionEstimate:
-    return PositionEstimate(Frame.GLOBAL, (x, y, 0.0), STILL, COV)
-
-
-def make_agent(agent_id, capabilities, x, y, speed=12.0):
-    return Agent(
-        AgentConfig(agent_id, PlatformClass.GROUP_1_MULTIROTOR,
-                    frozenset(capabilities), speed),
-        at(x, y),
-    )
-
-
-def make_target(target_id, position, threat, requirements):
-    return Target(target_id, position, threat, CHAR_TIME, requirements)
 
 
 def setup(agents, targets):

@@ -64,25 +64,23 @@ def main() -> None:
     agents = [
         Agent(
             AgentConfig(0, PlatformClass.GROUP_1_MULTIROTOR,
-                        frozenset({Capability.SURVEILLANCE}), 12.0),
-            at(10.0, 0.0)),
+                        frozenset({Capability.SURVEILLANCE})), at(10.0, 0.0)),
         Agent(
             AgentConfig(1, PlatformClass.GROUP_1_MULTIROTOR,
-                        frozenset({Capability.SURVEILLANCE}), 12.0),
-            at(0.0, 350.0)),
+                        frozenset({Capability.SURVEILLANCE})), at(0.0, 350.0)),
         Agent(
             AgentConfig(
                 2, PlatformClass.GROUP_2,
-                frozenset({Capability.SURVEILLANCE, Capability.MAPPING}),
-                25.0), at(50.0, 50.0)),
+                frozenset({Capability.SURVEILLANCE, Capability.MAPPING})),
+            at(50.0, 50.0)),
         Agent(
             AgentConfig(3, PlatformClass.GROUP_2,
-                        frozenset({Capability.STRIKE}), 25.0), at(0.0, 0.0)),
+                        frozenset({Capability.STRIKE})), at(0.0, 0.0)),
     ]
 
     targets_by_id = index_targets(targets)
     slots = buildSlots(targets)
-    slots_by_capability = group_slots(slots)
+    slots_by_role = group_slots(slots)
 
     ids = [a.config.agent_id for a in agents]
     complete = {i: [j for j in ids if j != i] for i in ids}
@@ -93,7 +91,7 @@ def main() -> None:
         f"{[(s.target_id, '+'.join(sorted(c.name for c in s.required)), s.rank) for s in slots]}\n"
     )
 
-    rounds = run_auction(agents, channel, slots_by_capability, targets_by_id)
+    rounds = run_auction(agents, channel, slots_by_role, targets_by_id)
 
     print(f"converged in {rounds} rounds\n")
     for agent in agents:

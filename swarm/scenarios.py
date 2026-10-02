@@ -62,6 +62,8 @@ def getDiameter(topology: dict[int, list[int]]) -> int:
     return int(diameter.max())
 
 
+#-------- helper functions ---------
+
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)
 CHAR_TIME = 60.0        # seconds; shared by every test target
@@ -71,10 +73,10 @@ def at(x: float, y: float, z: float = 0.0) -> PositionEstimate:
     return PositionEstimate(Frame.GLOBAL, (x, y, z), STILL, COV)
 
 
-def make_agent(agent_id, capabilities, x, y, speed=12.0):
+def make_agent(agent_id, capabilities, x, y):
     return Agent(
         AgentConfig(agent_id, PlatformClass.GROUP_1_MULTIROTOR,
-                    frozenset(capabilities), speed),
+                    frozenset(capabilities)),
         at(x, y),
     )
 
