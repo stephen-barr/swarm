@@ -25,7 +25,9 @@ from swarm.models import (
 )
 
 
-def line_edges(n) -> tuple[int, list[tuple[int, int]]]:
+def line_edges(
+    n
+) -> tuple[int, list[tuple[int, int]]]:     # returns a dict of sender -> receiver
     return n, [(i, i + 1) for i in range(n - 1)]
 
 
@@ -52,6 +54,7 @@ def edges_to_topology(
 
 # Find the max distance between any two points
 def getDiameter(topology: dict[int, list[int]]) -> int:
+
     a_matrix = np.zeros((len(topology), len(topology)))
     for node, neighbors in topology.items():
         a_matrix[node, neighbors] = 1
@@ -73,10 +76,13 @@ def at(x: float, y: float, z: float = 0.0) -> PositionEstimate:
     return PositionEstimate(Frame.GLOBAL, (x, y, z), STILL, COV)
 
 
-def make_agent(agent_id, capabilities, x, y):
+def make_agent(agent_id,
+               capabilities,
+               x,
+               y,
+               platform=PlatformClass.GROUP_1_MULTIROTOR):
     return Agent(
-        AgentConfig(agent_id, PlatformClass.GROUP_1_MULTIROTOR,
-                    frozenset(capabilities)),
+        AgentConfig(agent_id, platform, frozenset(capabilities)),
         at(x, y),
     )
 
@@ -112,12 +118,11 @@ def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
     rng = random.Random(seed)
     caps = list(Capability)
     targets = [
-        Target(
-            target_id=t,
-            target_position=at(rng.uniform(-500, 500), rng.uniform(-500, 500)),
-            threat_level=rng.uniform(0.1, 1.0),
-            threat_char_time=CHAR_TIME,
-            requirement_distribution={
+        make_target(
+            t,
+            at(rng.uniform(-500, 500), rng.uniform(-500, 500)),
+            rng.uniform(0.1, 1.0),
+            {
                 role(*rng.sample(caps, rng.randint(1, max_role_size))): {
                     n: rng.random()
                     for n in (1, 2, 3)

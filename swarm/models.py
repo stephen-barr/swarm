@@ -1,10 +1,15 @@
+"""
+Contains all of the types imported by other modules. No logic.
+"""
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import NamedTuple
 
 ThreeVector = tuple[float, float, float]
-Covariance = tuple[ThreeVector, ThreeVector, ThreeVector] # probability of any
-CountDistribution = dict[int, float]                      # distribution of agent needs per target
+Covariance = tuple[ThreeVector, ThreeVector,
+                   ThreeVector]                       # 3x3 covariance matrix
+CountDistribution = dict[int, float]                  # distribution of agent needs per target
 
 
 class Frame(Enum):
@@ -14,15 +19,23 @@ class Frame(Enum):
 
 @dataclass(frozen=True)
 class PositionEstimate:
+    """
+    Position estimate of an agent or target.
+    Covariance needed due to uncertainty from SLAM or vision front end.
+    Velocity not used yet, will correct uncertainty.
+    """
     frame: Frame                            # global or local
     position: ThreeVector                   # position in (x,y,z)
-    velocity: ThreeVector                   # Euclidean velocity
+    velocity: ThreeVector                   # Euclidean velocity, not used yet, will be used when postion covariance
     position_covariance: Covariance         # covariance matrix
 
 
-### Drone class
 @dataclass(frozen=True)
 class PlatformSpec:
+    """
+    Cruise_speed is currently used.
+    All other attributes are for later selection of tasks.
+    """
     mass_kg: float      # mass of platform
     cruise_speed: float
     max_altitude: int   # max_altitude
@@ -32,6 +45,11 @@ class PlatformSpec:
 
 ### Specifying possible drone classes
 class PlatformClass(Enum):
+    """
+    Units: kg, m/s, ft, s
+    Altitudes are given by drone group ceilings in ft
+    All specs are given as an example
+    """
     GROUP_1_MULTIROTOR = PlatformSpec(2.5, 12.0, 1_200, 35 * 60,
                                       True)                      # Skydio X2D-like
     GROUP_1_FIXED_WING = PlatformSpec(1.9, 13.0, 1_200, 90 * 60,
@@ -55,24 +73,32 @@ class Capability(Enum):
     STRIKE = auto()
 
 
-Role = frozenset[Capability]
+Role = frozenset[Capability]      # set of capabilites one agent has all of
 
 
 def role(*caps: Capability) -> Role:        # pass in capabilities get a role
     return frozenset(caps)
 
 
-class Slot(NamedTuple):
+class Slot(NamedTuple):           # one need (or slot) for an agent given by a target
     target_id: int
-    required: Role      # possible multiple capabilities for one slot
-    rank: int           # (target_id, capability, index)
+    required: Role                # lets target demand multiple roles for one target
+    rank: int                     # (target_id, capability, index)
 
 
-Winners = dict[Slot, tuple[float, int]]     # slot assigned to [score, agent]
+Winners = dict[Slot, tuple[
+    float, int]]                  # slot assigned to [score, agent], the best bid an agent knows
+                                  # order matters as beats() compares score to score then id to id
 
 
 @dataclass
 class Message:
+    """
+    Message is written by a single drone with a payload of Winners.
+
+    deliveryStep is a method, so the switch from asynchronous to
+    synchronous happens in one place.
+    """
     send_id: int
     receiver_id: int
     payload: Winners    # assume synchronous communication rounds
@@ -87,12 +113,15 @@ class Message:
 @dataclass(frozen=True)
 class AuctionResult:
     rounds: int
-    winners: Winners                        # the agreed table
-    assignment: dict[int, Slot | None]      # agent_id -> slot
-    total: float
-    filled: int
+    winners: Winners    # the agreed table
+    assignment: dict[
+        int, Slot |
+        None]           # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
+    total: float        # sum of winning scores, compared to optimal baseline
+    filled: int         # counts slots with a winner
 
 
 MessagesById = dict[int, list[Message]]               # {agent id : [Messages]}
 LOSES_TO_ALL = (float("-inf"), float("-inf")
-                )                                     # generic [score, agent] for look up methods
+                )                                     # generic bid that loses to all bids
+                                                      # allows updateWinners to not have cases

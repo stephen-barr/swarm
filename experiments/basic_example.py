@@ -1,99 +1,52 @@
 from __future__ import annotations
 
-from swarm.agent import (
-    Agent,
-    AgentConfig,
-    Target,
-    buildSlots,
-    group_slots,
-    index_targets,
-)
-from swarm.auction import run_auction
-from swarm.comms import Channel
-from swarm.models import (
-    Capability,
-    Covariance,
-    Frame,
-    PlatformClass,
-    PositionEstimate,
-    ThreeVector,
-    role,
-)
+from swarm.agent import buildSlots
+from swarm.models import Capability, PlatformClass, role
+from swarm.scenarios import at, make_agent, make_target, solve
+
+S = Capability.SURVEILLANCE
+M = Capability.MAPPING
 
 
-#### Example
 def main() -> None:
-    zero_cov: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    still: ThreeVector = (0.0, 0.0, 0.0)
-
-    def at(x: float, y: float, z: float = 0.0) -> PositionEstimate:
-        return PositionEstimate(Frame.GLOBAL, (x, y, z), still, zero_cov)
-
     targets = [
-        Target(
-            target_id=0,
-            target_position=at(100.0, 0.0),
-            threat_level=0.8,
-            threat_char_time=60.0,
-            requirement_distribution={
-                role(Capability.SURVEILLANCE): {
-                    1: 0.2,
-                    2: 0.7,
-                    3: 0.1
-                }
+        make_target(0, at(100.0, 0.0), 0.8,
+                    {role(S): {
+                         1: 0.2,
+                         2: 0.7,
+                         3: 0.1
+                     }}),
+        make_target(1, at(0.0, 400.0), 0.3, {
+            role(S): {
+                1: 0.9,
+                2: 0.1
             },
-        ),
-        Target(
-            target_id=1,
-            target_position=at(0.0, 400.0),
-            threat_level=0.3,
-            threat_char_time=60.0,
-            requirement_distribution={
-                role(Capability.SURVEILLANCE): {
-                    1: 0.9,
-                    2: 0.1
-                },
-                role(Capability.MAPPING): {
-                    1: 0.6,
-                    0: 0.4
-                },
+            role(M): {
+                1: 0.6,
+                0: 0.4
             },
-        ),
+        }),
     ]
 
     agents = [
-        Agent(
-            AgentConfig(0, PlatformClass.GROUP_1_MULTIROTOR,
-                        frozenset({Capability.SURVEILLANCE})), at(10.0, 0.0)),
-        Agent(
-            AgentConfig(1, PlatformClass.GROUP_1_MULTIROTOR,
-                        frozenset({Capability.SURVEILLANCE})), at(0.0, 350.0)),
-        Agent(
-            AgentConfig(
-                2, PlatformClass.GROUP_2,
-                frozenset({Capability.SURVEILLANCE, Capability.MAPPING})),
-            at(50.0, 50.0)),
-        Agent(
-            AgentConfig(3, PlatformClass.GROUP_2,
-                        frozenset({Capability.STRIKE})), at(0.0, 0.0)),
+        make_agent(0, {S}, 10.0, 0.0),
+        make_agent(1, {S}, 0.0, 350.0),
+        make_agent(2, {S, M}, 50.0, 50.0, platform=PlatformClass.GROUP_2),
+        make_agent(3, {Capability.STRIKE},
+                   0.0,
+                   0.0,
+                   platform=PlatformClass.GROUP_2),
     ]
 
-    targets_by_id = index_targets(targets)
     slots = buildSlots(targets)
-    slots_by_role = group_slots(slots)
-
-    ids = [a.config.agent_id for a in agents]
-    complete = {i: [j for j in ids if j != i] for i in ids}
-    channel = Channel(complete)
-
     print(
         f"{len(slots)} slots: "
         f"{[(s.target_id, '+'.join(sorted(c.name for c in s.required)), s.rank) for s in slots]}\n"
     )
 
-    rounds = run_auction(agents, channel, slots_by_role, targets_by_id)
+    result = solve(agents, targets)
 
-    print(f"converged in {rounds} rounds\n")
+    print(f"converged in {result.rounds} rounds\n")
     for agent in agents:
         if agent.slot is None:
             print(f"agent {agent.config.agent_id}: unassigned")
