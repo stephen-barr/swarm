@@ -12,6 +12,13 @@ EdgeList = dict[int, list[int]]   # agent_id : adjacent agents to the id
 
 
 class Channel:
+    """Delivers each agent's message to its neighbours in the topology.
+
+    message_delay: rounds between sending and delivery (0 = same round).
+    Messages are delivered sorted by (sender, send_step) so runs are
+    deterministic. end_step asserts every deliverable message was communicated,
+    catching an agent that skipped its receive phase.
+    """
 
     def __init__(self, edge_list: EdgeList) -> None:
         self.edge_list = edge_list

@@ -33,7 +33,7 @@ class Target:
     target_id: int                                        # id for target
     target_position: PositionEstimate                     # position estimate of target
     threat_level: float                                   # how dangerous is this target to my side
-    threat_char_time: float                               # time in seconds for the value of a target to half
+    threat_char_time: float                               # time in seconds for the value of a target to
     requirement_distribution: dict[
         Role,
         CountDistribution]                                # what is the estimated probability you need any number of a certain class of drones
@@ -65,6 +65,11 @@ class Agent:
         return self.winners
 
     def updateWinners(self, messages_for_agent: list[Message]) -> bool:
+        """Merge neighbours' tables into this agent's own, slot by slot.
+        For each slot, keep whichever bid wins under beats(). Because each slot only
+        keeps the best bid, the order messages arrive in doesn't matter, and getting
+        the same table twice changes nothing. Bids only ever improve.
+        """
         changed = False
         for m in messages_for_agent:                              # messages for agent is sorted by agent and time
             for slot, bid in m.payload.items():
@@ -82,9 +87,9 @@ class Agent:
                          target.target_position.position)
         time_to_arrival = dist / self.config.cruise_speed
         score = target.threat_level * np.exp(
-            -time_to_arrival / target.threat_char_time)
+            -time_to_arrival / target.threat_char_time
+        )                                              # use exponential model to lower score as t increases
         return score
-                                                       ### A target is only worth reaching within threat_level × 100 seconds
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],
             targets_by_id: dict[int, Target]) -> dict[Slot, float]:
@@ -139,6 +144,12 @@ class Agent:
 ### returns bool comparing (score, id). Id is arbitrary but tie breaks.
 ### future comparisons will compare time stamps as in async model
 def beats(challenger: tuple, incumbent: tuple) -> bool:
+    """
+    True if `challenger` outranks `incumbent` for the same slot.
+    Bids are (score, agent_id) tuples, higher score wins; on equal
+    scores, the higher agent_id wins (this is arbitrary, but gets rid of ties
+    and ensures convergence).
+    """
     return challenger > incumbent
 
 

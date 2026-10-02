@@ -5,6 +5,10 @@ from swarm.models import AuctionResult, Role, Slot, Winners
 
 def run_round(t, agents: list[Agent], channel: Channel, slots_by_capability,
               targets_by_id) -> None:
+    """All agents bid, then all send, then all receive.
+    Each phase happens in the same time period for every agent, so message 
+    reflects bids made this round. The assumption is synchronous rounds.
+    """
     channel.beginStep(t)
     for a in agents:
         a.auctionPhase(slots_by_capability, targets_by_id)

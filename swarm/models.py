@@ -81,7 +81,7 @@ class Message:
 
     @property
     def deliveryStep(self) -> int:
-        return self.send_step + self.message_delay    # using contant delayed model for now
+        return self.send_step + self.message_delay    # using constant delayed model for now
 
 
 @dataclass(frozen=True)

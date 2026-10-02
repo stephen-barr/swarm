@@ -14,8 +14,16 @@ def solveHungarian(agents: list[Agent],
                    slots: list[Slot],
                    targets_by_id: dict[int, Target],
                    coverage_first: bool = False) -> tuple[float, int]:
-    # if prioritizing utilizing drones: coverage_first = True -> heavily bias against unassigned spots
-    # if prioritizing maximizing score: coverage_first = False -> unassigned spots given zero
+    """
+    Optimal assignment under the same one-slot-per-agent rule as the auction.
+
+    Centralised algorithm: the function gets every agent's score directly.
+    Ineligible pairs are filled with 0 (true maximum of score) or a large
+    negative value (bias against unassigned spots). Real scores are strictly
+    positive under discounted scoring, so `chosen > 0` separates real
+    assignments from forced placeholder pairs.
+    """
+
     unassigned = -1e9 if coverage_first else 0.0
 
     # create a matrix where i,j = score(agent, slot)
@@ -32,7 +40,3 @@ def solveHungarian(agents: list[Agent],
     real = chosen[chosen > 0]               # boolean mask away any that are unnassigned
     return float(real.sum()), int(
         real.size)                          # returns (score, number of filled entries)
-
-
-### helper function that returns score, number of assignments
-### for distributed solution
