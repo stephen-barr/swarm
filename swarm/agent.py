@@ -171,7 +171,7 @@ def buildSlots(
     ]
 
 
-def index_targets(
+def indexTargets(
     targets: list[Target]
 ) -> dict[int, Target]:           # look up table from id to target
     return {target.target_id: target for target in targets}
