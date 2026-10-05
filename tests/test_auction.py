@@ -2,9 +2,9 @@ import pytest
 
 from swarm.agent import (
     buildSlots,
-    index_targets,
+    indexTargets,
 )
-from swarm.baselines import solveHungarian
+from swarm.baselines import greedyBaseline, solveHungarian
 from swarm.models import (
     Capability,
     role,
@@ -187,6 +187,16 @@ def test_distributed_to_hungarian(seed, graph):
     distr_auction_result = solve(agents, targets, graph)
     hung_total, _ = solveHungarian(agents,
                                    slots=buildSlots(targets),
-                                   targets_by_id=index_targets(targets))
+                                   targets_by_id=indexTargets(targets))
     assert distr_auction_result.total <= hung_total + 1e-6
     assert hung_total / 2 <= distr_auction_result.total
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("seed", range(50))
+def test_auction_is_equal_to_greedy_with_no_ties(seed, graph):
+    a, t = random_instance(seed=seed, multiple_slots_per_target=False)
+    auction_results = solve(a, t, graph)
+    greedy_results = greedyBaseline(a, buildSlots(t), indexTargets(t))
+    assert auction_results.total == pytest.approx(greedy_results[0])
+    assert auction_results.filled == pytest.approx(greedy_results[1])
