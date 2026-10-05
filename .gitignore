@@ -16,3 +16,4 @@ results/*
 !results/.gitkeep
 .vscode/
 *.egg-info/
+.coverage
