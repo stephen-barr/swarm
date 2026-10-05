@@ -9,7 +9,7 @@ from swarm.agent import (
     Target,
     buildSlots,
     group_slots,
-    index_targets,
+    indexTargets,
 )
 from swarm.auction import run_auction
 from swarm.comms import Channel
@@ -111,10 +111,14 @@ def solve(agents, targets, graph=complete_graph) -> AuctionResult:
     ids = [a.config.agent_id for a in agents]
     channel = Channel(graph(ids))
     return run_auction(agents, channel, group_slots(buildSlots(targets)),
-                       index_targets(targets))
+                       indexTargets(targets))
 
 
-def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
+def random_instance(seed,
+                    n_agents=6,
+                    n_targets=3,
+                    max_role_size=1,
+                    multiple_slots_per_target=True):
     """
     Build a random set of agents and targets for testing.
 
@@ -123,6 +127,9 @@ def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
     1-3 roles, each made of up to max_role_size capabilities, with random (unnormalized)
     weights over needing 1, 2, or 3 agents. The same seed always gives
     the same instance. Note the random weights will need to be fixed.
+
+    If multiple slots per target is false, target will only have one slot recreating conditions
+    of basic CBAA auction algorithm.
     """
 
     rng = random.Random(seed)
@@ -133,11 +140,15 @@ def random_instance(seed, n_agents=6, n_targets=3, max_role_size=1):
             at(rng.uniform(-500, 500), rng.uniform(-500, 500)),
             rng.uniform(0.1, 1.0),
             {
-                role(*rng.sample(caps, rng.randint(1, max_role_size))): {
+                role(*rng.sample(caps, rng.randint(1, max_role_size))):
+                ({
                     n: rng.random()
                     for n in (1, 2, 3)
-                }
-                for _ in range(rng.randint(1, 3))
+                } if multiple_slots_per_target else {
+                    1: 1.0
+                })
+                for _ in range(
+                    rng.randint(1, 3) if multiple_slots_per_target else 1)
             },
         ) for t in range(n_targets)
     ]

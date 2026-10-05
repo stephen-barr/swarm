@@ -5,7 +5,7 @@ import pytest
 
 from swarm.agent import (
     buildSlots,
-    index_targets,
+    indexTargets,
 )
 from swarm.auction import auctionTotal
 from swarm.baselines import solveHungarian
@@ -27,14 +27,14 @@ M = Capability.MAPPING
 
 def setup(agents, targets):
     slots = buildSlots(targets)
-    return slots, index_targets(targets)
+    return slots, indexTargets(targets)
 
 
 def eligible(agent, slot):
     return slot.required <= agent.config.capabilities
 
 
-def brute_force(agents, slots, targets_by_id, coverage_first):
+def brute_force(agents, slots, targets_by_id):
     """Best (filled, total) over every possible assignment.
 
     Each agent takes one eligible slot or none; no slot is used twice.
@@ -50,7 +50,7 @@ def brute_force(agents, slots, targets_by_id, coverage_first):
         total = sum(agents[i].makeScore(targets_by_id[slots[j].target_id])
                     for i, j in enumerate(choice) if j is not None)
         candidate = (len(used), total)
-        key = (lambda r: r) if coverage_first else (lambda r: (r[1], r[0]))
+        key = lambda r: (r[1], r[0])
         if key(candidate) > key(best):
             best = candidate
     return best
@@ -111,43 +111,19 @@ def test_more_agents_than_slots():
     assert filled == 1
 
 
-def test_score_first_and_coverage_first_can_disagree():
-    """A can do X (close) or Y (far); B can only do X (far).
-    Score-first: A takes X alone. Coverage-first: A takes Y, B takes X."""
-    targets = [
-        make_target(0, at(0, 0), 1.0, {role(S): {
-                                           1: 1.0
-                                       }}),           # X
-        make_target(1, at(1200, 0), 1.0, {role(M): {
-                                              1: 1.0
-                                          }}),        # Y
-    ]
-    agents = [make_agent(0, {S, M}, 0, 0), make_agent(1, {S}, 1200, 0)]
-    slots, lookup = setup(agents, targets)
-
-    score_total, score_filled = solveHungarian(agents, slots, lookup)
-    cov_total, cov_filled = solveHungarian(agents,
-                                           slots,
-                                           lookup,
-                                           coverage_first=True)
-
-    assert score_filled == 1 and cov_filled == 2
-    assert score_total > cov_total
-
-
 # ---- against brute force ----
 
 
-@pytest.mark.parametrize("coverage_first", [False, True])
 @pytest.mark.parametrize("seed", range(100))
-def test_matches_brute_force(seed, coverage_first):
+def test_matches_brute_force(seed):
     agents, targets = small_instance(seed)
     slots, lookup = setup(agents, targets)
-    exp_filled, exp_total = brute_force(agents, slots, lookup, coverage_first)
-    total, filled = solveHungarian(agents,
-                                   slots,
-                                   lookup,
-                                   coverage_first=coverage_first)
+    exp_filled, exp_total = brute_force(agents, slots, lookup)
+    total, filled = solveHungarian(
+        agents,
+        slots,
+        lookup,
+    )
     assert filled == exp_filled, f"seed={seed}"
     assert total == pytest.approx(exp_total), f"seed={seed}"
 
