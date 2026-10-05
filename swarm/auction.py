@@ -30,7 +30,7 @@ def run_auction(agents: list[Agent],
                 channel: Channel,
                 slots_by_role: dict[Role, list[Slot]],
                 targets_by_id: dict[int, Target],
-                max_rounds=200) -> AuctionResult:
+                max_rounds=500) -> AuctionResult:
     """
     Run synchronous auction rounds until no agent's table changes.
 
