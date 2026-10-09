@@ -125,3 +125,5 @@ MessagesById = dict[int, list[Message]]               # {agent id : [Messages]}
 LOSES_TO_ALL = (float("-inf"), float("-inf")
                 )                                     # generic bid that loses to all bids
                                                       # allows updateWinners to not have cases
+
+Graph = tuple[int, list[tuple[int, int]]]
