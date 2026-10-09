@@ -25,21 +25,18 @@ S = Capability.SURVEILLANCE
 M = Capability.MAPPING
 
 
-def setup(agents, targets):
-    slots = buildSlots(targets)
-    return slots, indexTargets(targets)
-
-
 def eligible(agent, slot):
     return slot.required <= agent.config.capabilities
 
 
-def brute_force(agents, slots, targets_by_id):
+def bruteForce(agents, targets):
     """Best (filled, total) over every possible assignment.
 
     Each agent takes one eligible slot or none; no slot is used twice.
     Score-first maximises total; coverage-first maximises filled, then total.
     """
+    slots = buildSlots(targets)
+    targets_by_id = indexTargets(targets)
     options = [[None] + [j for j, s in enumerate(slots) if eligible(a, s)]
                for a in agents]
     best = (0, 0.0)
@@ -82,15 +79,13 @@ def small_instance(seed):
 def test_no_eligible_pairs_gives_nothing():
     targets = [make_target(0, at(100, 0), 0.5, {role(M): {1: 1.0}})]
     agents = [make_agent(0, {S}, 0, 0)]
-    slots, lookup = setup(agents, targets)
-    assert solveHungarian(agents, slots, lookup) == (0.0, 0)
+    assert solveHungarian(agents, targets) == (0.0, 0)
 
 
 def test_single_eligible_pair_scores_exactly():
     targets = [make_target(0, at(100, 0), 0.5, {role(S): {1: 1.0}})]
     agents = [make_agent(0, {S}, 0, 0)]
-    slots, lookup = setup(agents, targets)
-    total, filled = solveHungarian(agents, slots, lookup)
+    total, filled = solveHungarian(agents, targets)
     assert filled == 1
     assert total == pytest.approx(agents[0].makeScore(targets[0]))
 
@@ -98,16 +93,14 @@ def test_single_eligible_pair_scores_exactly():
 def test_ineligible_agent_is_never_counted():
     targets = [make_target(0, at(100, 0), 0.5, {role(S): {1: 1.0}})]
     agents = [make_agent(0, {S}, 0, 0), make_agent(1, {M}, 0, 0)]
-    slots, lookup = setup(agents, targets)
-    _, filled = solveHungarian(agents, slots, lookup)
+    _, filled = solveHungarian(agents, targets)
     assert filled == 1
 
 
 def test_more_agents_than_slots():
     targets = [make_target(0, at(100, 0), 0.5, {role(S): {1: 1.0}})]
     agents = [make_agent(i, {S}, 10 * i, 0) for i in range(4)]
-    slots, lookup = setup(agents, targets)
-    _, filled = solveHungarian(agents, slots, lookup)
+    _, filled = solveHungarian(agents, targets)
     assert filled == 1
 
 
@@ -117,13 +110,8 @@ def test_more_agents_than_slots():
 @pytest.mark.parametrize("seed", range(100))
 def test_matches_brute_force(seed):
     agents, targets = small_instance(seed)
-    slots, lookup = setup(agents, targets)
-    exp_filled, exp_total = brute_force(agents, slots, lookup)
-    total, filled = solveHungarian(
-        agents,
-        slots,
-        lookup,
-    )
+    exp_filled, exp_total = bruteForce(agents, targets)
+    total, filled = solveHungarian(agents, targets)
     assert filled == exp_filled, f"seed={seed}"
     assert total == pytest.approx(exp_total), f"seed={seed}"
 
