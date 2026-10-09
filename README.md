@@ -9,6 +9,24 @@ Such a question is of broad interest to the field of autonomous systems. Conside
 
 *Medical triage via unmanned vehicles requires real-time coalition assignments with uncertain priority and capability requirements. Such systems are often needed in hostile environments where RF communication is jammed, leading to packet loss. How can a swarm accurately allocate capabilities to casualties?*
 
+## Benchmark Results
+800 random instances across four swarm sizes, each solved on complete, ring and line topologies and compared against the optimal (Hungarian) assignment.
+
+| Drones | Targets | Infeasible | Mean % of optimal | 5th percentile | Worst | Exactly optimal | Coverage | Same as greedy |
+|---|---|---|---|---|---|---|---|---|
+| 6 | 3 | 6 | 99.3% | 98.7% | 69.5% | 94% | 99.1% | 98% |
+| 12 | 6 | 0 | 97.9% | 90.4% | 83.6% | 55% | 96.7% | 92% |
+| 24 | 12 | 0 | 96.7% | 92.1% | 89.2% | 10% | 95.7% | 72% |
+| 48 | 24 | 0 | 95.4% | 91.5% | 85.8% | 0% | 95.7% | 43% |
+
+- **Consistent assignment on every topology.** On all 1,600 instances, the line and ring assignments agreed with the complete topology (every agent can talk to every other agent), despute truly distributed communication.
+
+- **Converges well inside of theoretical bounds** Worst case instance only resulted in 67% of the theoretical maximum of rounds and improves with increased agents/targets.
+
+- **Far above the worst-case guarantee.** The auction is theoretically guaranteed in the worst-case to reach half the optimum; the worst instance across all 800 runs reached 69.5%, and 95% of instances at every size reached at least 90%.
+
+Full results, including convergence by network, and how to reproduce them: [docs/results.md](docs/results.md)
+
 ## Status and Direction
 
 Currently this project implements decentralized single-assignment auctions (CBAA) with multi-capability roles, checked against the optimal assignment found through a Hungarian algorithm.
