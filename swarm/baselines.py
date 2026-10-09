@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from swarm.agent import Agent, Target
+from swarm.agent import Agent, Target, buildSlots, indexTargets
 from swarm.models import Slot
 
 
@@ -27,8 +27,7 @@ def createScoreMatrix(
 
 def solveHungarian(
     agents: list[Agent],
-    slots: list[Slot],
-    targets_by_id: dict[int, Target],
+    targets: list[Target],
 ) -> tuple[float, int]:
     """
     Optimal assignment under the same one-slot-per-agent rule as the auction.
@@ -40,6 +39,9 @@ def solveHungarian(
 
     Returns (total score, slots filled)
     """
+    targets_by_id: dict[int, Target] = indexTargets(targets)
+    slots = buildSlots(targets)
+
     m = createScoreMatrix(agents, slots, targets_by_id)
 
     agent_assignment, slot_assignment = linear_sum_assignment(m, maximize=True)
@@ -53,8 +55,7 @@ def solveHungarian(
 
 def greedyBaseline(
     agents: list[Agent],
-    slots: list[Slot],
-    targets_by_id: dict[int, Target],
+    targets: list[Target],
 ) -> tuple[float, int]:
     """
     Establish the greedy algorithm baseline that differs from auction only on ties
@@ -64,6 +65,9 @@ def greedyBaseline(
     Assign the highest scoring pair, zero the corresponding agent and slot scores
     (row and column) and continue until no eligible pairs are left.
     """
+
+    slots = buildSlots(targets)
+    targets_by_id = indexTargets(targets)
     unassigned = 0.0
 
     m = createScoreMatrix(agents, slots, targets_by_id)
