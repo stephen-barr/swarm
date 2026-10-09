@@ -18,11 +18,14 @@ from swarm.models import (
     Capability,
     Covariance,
     Frame,
+    Graph,
     PlatformClass,
     PositionEstimate,
     ThreeVector,
     role,
 )
+
+EdgeDict = dict[int, list[int]]
 
 
 def line_edges(n) -> tuple[int, list[tuple[int, int]]]:
@@ -40,8 +43,7 @@ def ring_edges(n) -> tuple[int, list[tuple[int, int]]]:
     return n, ring
 
 
-def edges_to_topology(
-        graph: tuple[int, list[tuple[int, int]]]) -> dict[int, list[int]]:
+def edges_to_topology(graph: Graph) -> EdgeDict:
     n, edges = graph
     topology = {i: [] for i in range(n)}
     for k, v in edges:
@@ -89,23 +91,27 @@ def make_target(target_id, position, threat, requirements):
     return Target(target_id, position, threat, CHAR_TIME, requirements)
 
 
-def complete_graph(ids):
+def complete_graph(ids) -> EdgeDict:
     return edges_to_topology(complete_edges(len(ids)))
 
 
-def line_graph(ids):
+def line_graph(ids) -> EdgeDict:
     return edges_to_topology(line_edges(len(ids)))
 
 
-def ring_graph(ids):
+def ring_graph(ids) -> EdgeDict:
     return edges_to_topology(ring_edges(len(ids)))
 
 
 ###
 
 
-def solve(agents, targets, graph=complete_graph) -> AuctionResult:
+def solve(agents: list[Agent],
+          targets: list[Target],
+          graph=complete_graph) -> AuctionResult:
     """
+    Intended front end function of auction.
+
     Run a distributed auction on a complete graph. Return an AuctionResult object.
     """
     ids = [a.config.agent_id for a in agents]
@@ -114,11 +120,12 @@ def solve(agents, targets, graph=complete_graph) -> AuctionResult:
                        indexTargets(targets))
 
 
-def random_instance(seed,
-                    n_agents=6,
-                    n_targets=3,
-                    max_role_size=1,
-                    multiple_slots_per_target=True):
+def random_instance(
+        seed,
+        n_agents=6,
+        n_targets=3,
+        max_role_size=1,
+        multiple_slots_per_target=True) -> tuple[list[Agent], list[Target]]:
     """
     Build a random set of agents and targets for testing.
 
