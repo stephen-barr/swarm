@@ -1,9 +1,23 @@
+# Benchmark Results
+
+200 random instances per configuration, roles of up to 2 capabilities, drones and targets placed in a 1,000 × 1,000 area, each run on complete, ring and line networks.
+
+To reproduce these tables: `python -m experiments.benchmark`, then print `python -m experiments.summary`
+
+## Solution Quality
+- Quality analysis uses complete graph runs, since slot assignment is identical on every topology. 
+- Percentages are relative to Hungarian assignment (provably optimal). 
+- Infeasible gives the number of runs which generated no viable assignments based on drone capability/target requirement mismatch, and were excluded from subsequent calculations.
+
 | Drones | Targets | Infeasible | Mean % of optimal | 5th percentile | Worst | Exactly optimal | Coverage | Same as greedy |
 |---|---|---|---|---|---|---|---|---|
 | 6 | 3 | 6 | 99.3% | 98.7% | 69.5% | 94% | 99.1% | 98% |
 | 12 | 6 | 0 | 97.9% | 90.4% | 83.6% | 55% | 96.7% | 92% |
 | 24 | 12 | 0 | 96.7% | 92.1% | 89.2% | 10% | 95.7% | 72% |
 | 48 | 24 | 0 | 95.4% | 91.5% | 85.8% | 0% | 95.7% | 43% |
+
+## Convergence
+Convergence is bounded by slots × diameter in the theoretical worst case.
 
 | Drones | Targets | Network | Diameter | Median rounds | Max rounds | Median rounds / diameter | Worst rounds / bound | Median messages | Same as complete |
 |---|---|---|---|---|---|---|---|---|---|
@@ -21,4 +35,5 @@
 | 48 | 24 | line | 47 | 136 | 221 | 2.89 | 0.05 | 12,784 | 100% |
 
 Ring and line assignment identical to complete graph: 1600/1600 runs
+
 Runs where the auction exceeded the optimum: 0
