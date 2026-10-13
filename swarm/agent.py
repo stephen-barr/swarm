@@ -201,7 +201,7 @@ def indexTargets(
     return {target.target_id: target for target in targets}
 
 
-def group_slots(
+def groupSlots(
         slots: list[Slot]
 ) -> dict[Role, list[Slot]]:      # group slots by capability
     slots_by_role: dict[Role, list[Slot]] = defaultdict(list)

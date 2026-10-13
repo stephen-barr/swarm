@@ -142,7 +142,7 @@ def test_assignments_respect_capabilities(seed, role_size, graph):
 def test_terminates(seed, graph):
     agents, targets = random_instance(seed)
     solution = solve(agents, targets,
-                     graph)                 # run_auction raises if it doesn't converge
+                     graph)                 # runAuction raises if it doesn't converge
     assert solution.rounds < 200, f"slow convergence, seed={seed}"
 
 

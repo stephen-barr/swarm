@@ -8,10 +8,10 @@ from swarm.agent import (
     AgentConfig,
     Target,
     buildSlots,
-    group_slots,
+    groupSlots,
     indexTargets,
 )
-from swarm.auction import run_auction
+from swarm.auction import runAuction
 from swarm.comms import Channel
 from swarm.models import (
     AuctionResult,
@@ -117,8 +117,8 @@ def solve(agents: list[Agent],
     """
     ids = [a.config.agent_id for a in agents]
     channel = Channel[Payload](graph(ids))
-    return run_auction(agents, channel, group_slots(buildSlots(targets)),
-                       indexTargets(targets))
+    return runAuction(agents, channel, groupSlots(buildSlots(targets)),
+                      indexTargets(targets))
 
 
 def random_instance(
