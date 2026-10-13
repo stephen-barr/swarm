@@ -4,7 +4,7 @@ Contains all of the types imported by other modules. No logic.
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import NamedTuple
+from typing import Generic, NamedTuple, TypeVar
 
 ThreeVector = tuple[float, float, float]
 Covariance = tuple[ThreeVector, ThreeVector,
@@ -80,28 +80,48 @@ def role(*caps: Capability) -> Role:        # pass in capabilities get a role
     return frozenset(caps)
 
 
+@dataclass(frozen=True)
+class AgentConfig:
+    agent_id: int                           # id for agent
+    platform: PlatformClass                 # what platform is the agent
+    capabilities: frozenset[Capability]     # what capabilities does the agent have
+
+
 class Slot(NamedTuple):           # one need (or slot) for an agent given by a target
     target_id: int
     required: Role                # lets target demand multiple roles for one target
-    rank: int                     # (target_id, capability, index)
+    rank: int                     # (target_id, required, index)
 
 
 Winners = dict[Slot, tuple[
     float, int]]                  # slot assigned to [score, agent], the best bid an agent knows
                                   # order matters as beats() compares score to score then id to id
 
+Census = dict[int, AgentConfig]
+
+
+class Payload(NamedTuple):
+    winners: Winners
+    census: Census | None = None
+
+
+P = TypeVar("P")
+
 
 @dataclass
-class Message:
+class Message(Generic[P]):
     """
-    Message is written by a single drone with a payload of Winners.
+    Generic message for any type of payload.
+
+    Message is written by a single drone.
 
     deliveryStep is a property, so the switch from synchronous to
     asynchronous happens in one place.
     """
+
     send_id: int
     receiver_id: int
-    payload: Winners    # assume synchronous communication rounds
+    payload: P
     send_step: int
     message_delay: int = 0
 

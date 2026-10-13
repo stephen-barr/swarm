@@ -1,17 +1,12 @@
-from typing import Any
+import copy
+from typing import Generic
 
-from swarm.models import Message, MessagesById
-
-# Message is (send_id, receiver_id,
-# payload, send_step, deliver step)
-
-# Slot is (target_id, capability, index)
-# Winners is Slot : [score, agent]
+from swarm.models import Message, P
 
 EdgeList = dict[int, list[int]]   # agent_id : adjacent agents to the id
 
 
-class Channel:
+class Channel(Generic[P]):
     """Delivers each agent's message to its neighbours in the topology.
 
     message_delay: rounds between sending and delivery (0 = same round).
@@ -23,25 +18,36 @@ class Channel:
     def __init__(self, edge_list: EdgeList) -> None:
         self.edge_list = edge_list
         self.time_step: int = 0
-        self.message_delay: int = 0         # set the message delay to zero as default
-        self.mailbox: MessagesById = {agent_id: [] for agent_id in edge_list}
+        self.message_delay: int = 0                   # set the message delay to zero as default
+        self.mailbox: dict[int, list[Message[P]]] = {
+            agent_id: []
+            for agent_id in edge_list
+        }
+        self.transmissions: int = 0                   # number of transmissions
 
     def beginStep(self, t) -> None:
         assert t == self.time_step + 1, f"expected step {self.time_step + 1}, got {t}"
         self.time_step = t
 
-    def transmitMessage(self, sending_agent_id: int, payload: Any) -> None:
+    def transmitMessage(
+        self,
+        sending_agent_id: int,
+        payload: P,
+    ) -> None:
+
+        self.transmissions += 1                       # increment count of transmissions
         for neighbor_id in self.edge_list[sending_agent_id]:
-            message: Message = Message(
+            snapshot = copy.deepcopy(payload)         # create a copy of the payload
+            message = Message(
                 send_id=sending_agent_id,
                 receiver_id=neighbor_id,
-                payload=dict(payload),
+                payload=snapshot,
                 send_step=self.time_step,
                 message_delay=self.message_delay,
             )
             self.mailbox[neighbor_id].append(message)
 
-    def deliverMessage(self, recipient_id: int) -> list[Message]:
+    def deliverMessage(self, recipient_id: int) -> list[Message[P]]:
         box: list[Message] = self.mailbox[
             recipient_id]                                      # get the messages for the recipient
         current_messages: list[Message] = [

@@ -19,6 +19,7 @@ from swarm.models import (
     Covariance,
     Frame,
     Graph,
+    Payload,
     PlatformClass,
     PositionEstimate,
     ThreeVector,
@@ -115,7 +116,7 @@ def solve(agents: list[Agent],
     Run a distributed auction on a complete graph. Return an AuctionResult object.
     """
     ids = [a.config.agent_id for a in agents]
-    channel = Channel(graph(ids))
+    channel = Channel[Payload](graph(ids))
     return run_auction(agents, channel, group_slots(buildSlots(targets)),
                        indexTargets(targets))
 

@@ -14,23 +14,16 @@ import numpy as np
 
 from swarm.models import (
     LOSES_TO_ALL,
-    Capability,
+    AgentConfig,
     CountDistribution,
     Frame,
     Message,
-    PlatformClass,
+    Payload,
     PositionEstimate,
     Role,
     Slot,
     Winners,
 )
-
-
-@dataclass
-class AgentConfig:
-    agent_id: int                           # id for agent
-    platform: PlatformClass                 # what platform is the agent
-    capabilities: frozenset[Capability]     # what capabilities does the agent have
 
 
 @dataclass
@@ -67,26 +60,56 @@ class Agent:
         self.config = config
         self.agent_position = agent_position
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
-        self.inbox: list[Message] = []
+        self.inbox: list[Message[Payload]] = []
         self.winners: Winners = {}                                       # {slot : [score, agent]}
+        self.census: dict[int, AgentConfig] = {
+            config.agent_id: config
+        }                                                                # agent config of every agent
+        self.census_to_share: bool = True                                # true if agent's table has changed since last sent
 
-    def outgoing(self) -> Winners:          # return winners to channel
-        return self.winners
+    def outgoing(self) -> Payload:                                  # returns one payload per round
+        census = None
+        if self.census_to_share:
+            census = self.census
+            self.census_to_share = False                            # set flag for sharing census to False
+        payload_to_be_sent: Payload = Payload(winners=self.winners,
+                                              census=census)
+        return payload_to_be_sent
 
-    def updateWinners(self, messages_for_agent: list[Message]) -> bool:
-        """Merge neighbours' tables into this agent's own, slot by slot.
+    def updateWinners(self, messages: list[Message[Payload]]) -> bool:
+        """
+        Merge neighbours' tables into this agent's own, slot by slot.
         For each slot, keep whichever bid wins under beats(). Because each slot only
         keeps the best bid, the order messages arrive in doesn't matter, and getting
         the same table twice changes nothing. Bids only ever improve.
         """
         changed = False
-        for m in messages_for_agent:                              # messages for agent is sorted by agent and time
-            for slot, bid in m.payload.items():
+        for m in messages:                            # messages for agent is sorted by agent and time
+            for slot, bid in m.payload.winners.items():
                 if beats(
-                        bid, self.winners.get(slot, LOSES_TO_ALL)
-                ):                                                # update only the slots that have changed or are not yet present
+                        bid,
+                        self.winners.get(
+                            slot, LOSES_TO_ALL
+                        )                             # a slot that is not yet assigned is given LOSES_TO_ALL
+                ):                                    # update only the slots that have changed or are not yet present
                     self.winners[slot] = bid
                     changed = True
+        return changed
+
+    def updateCensus(self, messages: list[Message[Payload]]) -> bool:
+        """
+        Merge agent_config information from neighbors into own census.
+        """
+        changed = False
+
+        for m in messages:
+            if m.payload.census is None:
+                continue
+            for agent_id, agent_config in m.payload.census.items():
+                if agent_id not in self.census:
+                    self.census[agent_id] = agent_config
+                    changed = True
+                    self.census_to_share = True
         return changed
 
     def makeScore(
@@ -141,10 +164,11 @@ class Agent:
         if self.slot is None: return        # if unassigned, nothing to do
         _, winner_id = self.winners[self.slot]
         if winner_id != self.config.agent_id:
-            self.slot = None
+            self.slot = None                # if outbid on slot, release slot internally
             return
 
-    def receieve(self, messages: list[Message]):
+    def receieve(self, messages: list[Message[Payload]]):
+        self.updateCensus(messages)
         self.updateWinners(messages)        # update winners from message list
         self.consensusPhase()               # check if you are still assigned
 
