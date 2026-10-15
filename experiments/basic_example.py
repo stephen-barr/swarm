@@ -51,7 +51,7 @@ def main() -> None:
         if agent.slot is None:
             print(f"agent {agent.config.agent_id}: unassigned")
         else:
-            score, _ = agent.winners[agent.slot]
+            score = agent.winners[agent.slot].score
             s = agent.slot
             print(
                 f"agent {agent.config.agent_id}: target {s.target_id} "

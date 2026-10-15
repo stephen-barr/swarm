@@ -10,6 +10,7 @@ from swarm.agent import (
 from swarm.auction import auctionTotal
 from swarm.baselines import solveHungarian
 from swarm.models import (
+    Bid,
     Capability,
     Covariance,
     ThreeVector,
@@ -126,7 +127,7 @@ def test_auction_total_of_empty_table_is_zero():
 def test_auction_total_sums_scores_not_ids():
     targets = [make_target(0, at(0, 0), 0.5, {role(S): {2: 1.0}})]
     slots = buildSlots(targets)
-    winners = {slots[0]: (12.5, 3), slots[1]: (7.5, 4)}
+    winners = {slots[0]: Bid(12.5, 3, 0), slots[1]: Bid(7.5, 4, 0)}
     total, filled = auctionTotal(winners)
     assert total == pytest.approx(20.0)
     assert filled == 2

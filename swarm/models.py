@@ -2,6 +2,7 @@
 Contains all of the types imported by other modules. No logic.
 """
 
+import sys
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Generic, NamedTuple, TypeVar
@@ -87,15 +88,21 @@ class AgentConfig:
     capabilities: frozenset[Capability]     # what capabilities does the agent have
 
 
+class Bid(NamedTuple):
+    score: float
+    agent: int
+    version: int
+
+
 class Slot(NamedTuple):           # one need (or slot) for an agent given by a target
     target_id: int
     required: Role                # lets target demand multiple roles for one target
     rank: int                     # (target_id, required, index)
 
 
-Winners = dict[Slot, tuple[
-    float, int]]                  # slot assigned to [score, agent], the best bid an agent knows
-                                  # order matters as beats() compares score to score then id to id
+Winners = dict[
+    Slot, Bid]          # slot assigned to [score, agent], the best bid an agent knows
+                        # order matters as beats() compares score to score then id to id
 
 Census = dict[int, AgentConfig]
 
@@ -141,9 +148,10 @@ class AuctionResult:
     filled: int         # counts slots with a winner
 
 
-MessagesById = dict[int, list[Message]]               # {agent id : [Messages]}
-LOSES_TO_ALL = (float("-inf"), float("-inf")
-                )                                     # generic bid that loses to all bids
+MessagesById = dict[int, list[Message]]     # {agent id : [Messages]}
+
+LOSES_TO_ALL = Bid(float("-inf"), int(-sys.maxsize),
+                   int(-sys.maxsize))                 # generic bid that loses to all bids
                                                       # allows updateWinners to not have cases
 
 Graph = tuple[int, list[tuple[int, int]]]

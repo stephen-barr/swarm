@@ -23,7 +23,7 @@ def auctionTotal(
     winners: Winners
 ) -> tuple[float,
            int]:        # Returns (sum of winning scores, number of slots filled)
-    return sum((score for score, _ in winners.values())), len(winners)
+    return sum(bid.score for bid in winners.values()), len(winners)
 
 
 def runAuction(agents: list[Agent],

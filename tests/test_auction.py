@@ -163,7 +163,7 @@ def test_held_slots_match_the_shared_table(seed, graph):
     table = agents[0].winners
     for a in agents:
         if a.slot is not None:
-            _, winner_id = table[a.slot]
+            winner_id = table[a.slot].agent
             assert winner_id == a.config.agent_id, f"seed={seed}"
 
 

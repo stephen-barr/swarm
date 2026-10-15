@@ -15,6 +15,7 @@ import numpy as np
 from swarm.models import (
     LOSES_TO_ALL,
     AgentConfig,
+    Bid,
     CountDistribution,
     Frame,
     Message,
@@ -61,11 +62,12 @@ class Agent:
         self.agent_position = agent_position
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
         self.inbox: list[Message[Payload]] = []
-        self.winners: Winners = {}                                       # {slot : [score, agent]}
+        self.winners: Winners = {}                                       # {slot : bid}
         self.census: dict[int, AgentConfig] = {
             config.agent_id: config
         }                                                                # agent config of every agent
         self.census_to_share: bool = True                                # true if agent's table has changed since last sent
+        self.version = 0                                                 # version number dictates rebids, only changes
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
         census = None
@@ -124,7 +126,7 @@ class Agent:
         return score
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],
-            targets_by_id: dict[int, Target]) -> dict[Slot, float]:
+            targets_by_id: dict[int, Target]) -> dict[Slot, Bid]:
         scores = {
             t_id: self.makeScore(target)
             for t_id, target in targets_by_id.items()
@@ -132,7 +134,10 @@ class Agent:
 
         ### score only the slots that agent can meet requirements
         return {
-            s: scores[s.target_id]
+            s:
+            Bid(score=scores[s.target_id],
+                agent=self.config.agent_id,
+                version=self.version)
             for required, role_slots in slots_by_role.items()
             if required <= self.config.capabilities for s in role_slots
         }
@@ -140,30 +145,32 @@ class Agent:
     def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
                      targets_by_id: dict[int, Target]) -> None:
         if self.slot is not None:
-            return                                                          # already assigned
+            return                                                      # already assigned
         bids = self.bid(slots_by_role, targets_by_id)
-        contenders: dict[Slot, float] = {
-            s: score
-            for s, score in bids.items() if s not in self.winners or beats(
-                (                                                           # only consider slots that are not filled
-                    score, self.config.agent_id),
-                self.winners[s])                                            # OR slots that agent can win.
+        contenders: dict[Slot, Bid] = {
+            s: b
+            for s, b in bids.items() if s not in self.winners or beats(
+                b,                                                      # only consider slots that are not filled
+                self.winners[s])                                        # OR slots that agent can win.
         }
         if not contenders:
-            return                                                          # no assignments for the agent
+            return                                                      # no assignments for the agent
 
         best_slot: Slot = max(
-            contenders, key=lambda s: (contenders[s], s.target_id, s.rank)
-        )                                                                  # best slot by score; ties go to the higher target_id, then the higher rank
-        self.winners[best_slot] = (
-            contenders[best_slot], self.config.agent_id
-        )                                                                  # write the agent as the winner to the best slot
-        self.slot = best_slot                                              # assign myself the new slot
+            contenders,
+            key=lambda s: (contenders[s].score, s.target_id, s.rank)
+        )                                                            # best slot by score; ties go to the higher target_id, then the higher rank
+        self.winners[best_slot] = Bid(
+            score=contenders[best_slot].score,
+            agent=self.config.agent_id,
+            version=self.version
+        )                                                            # write the agent as the winner to the best slot
+        self.slot = best_slot                                        # assign myself the new slot
 
     def consensusPhase(self):
         if self.slot is None: return        # if unassigned, nothing to do
-        _, winner_id = self.winners[self.slot]
-        if winner_id != self.config.agent_id:
+        bid_agent_id = self.winners[self.slot].agent
+        if bid_agent_id != self.config.agent_id:
             self.slot = None                # if outbid on slot, release slot internally
             return
 
@@ -176,7 +183,7 @@ class Agent:
 ### comparison between two agents
 ### returns bool comparing (score, id). Id is arbitrary but tie breaks.
 ### future comparisons will compare time stamps as in async model
-def beats(challenger: tuple, incumbent: tuple) -> bool:
+def beats(challenger: Bid, incumbent: Bid) -> bool:
     """
     True if `challenger` outranks `incumbent` for the same slot.
     Bids are (score, agent_id) tuples, higher score wins; on equal
