@@ -1,5 +1,7 @@
 import pytest
 
+from swarm.agent import indexTargets
+from swarm.auction import rawTotal, weightedTotal
 from swarm.baselines import greedyBaseline, solveHungarian
 from swarm.models import (
     Capability,
@@ -163,7 +165,7 @@ def test_held_slots_match_the_shared_table(seed, graph):
     table = agents[0].winners
     for a in agents:
         if a.slot is not None:
-            winner_id = table[a.slot].agent
+            winner_id = table[a.slot].agent_id
             assert winner_id == a.config.agent_id, f"seed={seed}"
 
 
@@ -197,3 +199,14 @@ def test_auction_is_equal_to_greedy_with_no_ties(seed, graph):
     greedy_results = greedyBaseline(a, t)
     assert auction_results.total == pytest.approx(greedy_results[0])
     assert auction_results.filled == pytest.approx(greedy_results[1])
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("seed", range(50))
+def test_raw_is_equal_to_weighted_when_k_is_zero(seed, graph):
+    a, t = random_instance(seed=seed, multiple_slots_per_target=False)
+    auction_results = solve(a, t, graph)
+    raw_total, raw_filled = auction_results.total, auction_results.filled
+    weighted_total, weighted_filled = weightedTotal(auction_results.winners)
+    assert raw_total == pytest.approx(weighted_total)
+    assert raw_filled == weighted_filled
