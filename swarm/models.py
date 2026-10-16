@@ -106,10 +106,13 @@ Winners = dict[
 
 Census = dict[int, AgentConfig]
 
+Latest = dict[int, int]           # agent_id : version table
+
 
 class Payload(NamedTuple):
     winners: Winners
     census: Census | None = None
+    latest: Latest | None = None
 
 
 P = TypeVar("P")

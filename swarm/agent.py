@@ -18,6 +18,7 @@ from swarm.models import (
     Bid,
     CountDistribution,
     Frame,
+    Latest,
     Message,
     Payload,
     PositionEstimate,
@@ -57,7 +58,7 @@ class Agent:
         if agent_position.frame is not Frame.GLOBAL:
             raise ValueError(
                 f"agent {config.agent_id} needs a global-frame position"
-            )                                                            # ensure concistency between measurements
+            )                                                            # ensure consistency between measurements
         self.config = config
         self.agent_position = agent_position
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
@@ -66,24 +67,32 @@ class Agent:
         self.census: dict[int, AgentConfig] = {
             config.agent_id: config
         }                                                                # agent config of every agent
+        self.latest: Latest = {
+            config.agent_id: 0
+        }                                                                # dict of agent_id : version pairs
         self.census_to_share: bool = True                                # true if agent's table has changed since last sent
-        self.version = 0                                                 # version number dictates rebids, only changes
+        self.latest_to_share: bool = True
+        self.version: int = 0                                            # version number dictates rebids, only changes
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
         census = None
         if self.census_to_share:
             census = self.census
             self.census_to_share = False                            # set flag for sharing census to False
+        latest = None
+        if self.latest_to_share:
+            latest = self.latest
+            self.latest_to_share = False
         payload_to_be_sent: Payload = Payload(winners=self.winners,
-                                              census=census)
+                                              census=census,
+                                              latest=latest)
         return payload_to_be_sent
 
     def updateWinners(self, messages: list[Message[Payload]]) -> bool:
         """
         Merge neighbours' tables into this agent's own, slot by slot.
-        For each slot, keep whichever bid wins under beats(). Because each slot only
-        keeps the best bid, the order messages arrive in doesn't matter, and getting
-        the same table twice changes nothing. Bids only ever improve.
+        For each slot, keep whichever bid wins under beats(). 
+        Checks if the new bid has a higher version than the old.
         """
         changed = False
         for m in messages:                            # messages for agent is sorted by agent and time
@@ -93,8 +102,12 @@ class Agent:
                         self.winners.get(
                             slot, LOSES_TO_ALL
                         )                             # a slot that is not yet assigned is given LOSES_TO_ALL
-                ):                                    # update only the slots that have changed or are not yet present
+                ) and bid.version >= self.latest.get(
+                        bid.agent, 0
+                ):                                    # check that the new message is more recent than the most recent message                                    # update only the slots that have changed or are not yet present
                     self.winners[slot] = bid
+                    self.latest[bid.agent] = bid.version
+                    self.latest_to_share = True       # flag that latest needs to be shared
                     changed = True
         return changed
 
@@ -112,6 +125,32 @@ class Agent:
                     self.census[agent_id] = agent_config
                     changed = True
                     self.census_to_share = True
+        return changed
+
+    def mergeLatest(self, messages: list[Message[Payload]]) -> bool:
+        """
+        Merge the most recent messages (based on version) to latest table.
+        """
+
+        changed = False
+        changed_versions = set()
+        for m in messages:
+            if m.payload.latest is None:
+                continue
+            for agent_id, new_version in m.payload.latest.items():
+                if agent_id not in self.latest or self.latest[
+                        agent_id] < new_version:
+                    self.latest[
+                        agent_id] = new_version       # if the agent id hasnt been heard from yet, or the version is newer add version to latest
+                    changed_versions.add(
+                        agent_id)                     # add it to the list of agents to change
+                    changed = True
+                    self.latest_to_share = True       # set flag to share latest
+        if changed_versions:
+            for s, b in list(self.winners.items()):
+                if b.agent in changed_versions:
+                    self.winners.pop(
+                        s)                            # delete any winners with more recent messages
         return changed
 
     def makeScore(
@@ -176,13 +215,13 @@ class Agent:
 
     def receieve(self, messages: list[Message[Payload]]):
         self.updateCensus(messages)
+        self.mergeLatest(messages)
         self.updateWinners(messages)        # update winners from message list
         self.consensusPhase()               # check if you are still assigned
 
 
 ### comparison between two agents
-### returns bool comparing (score, id). Id is arbitrary but tie breaks.
-### future comparisons will compare time stamps as in async model
+### returns bool comparing score, note version has primacy from the other functions
 def beats(challenger: Bid, incumbent: Bid) -> bool:
     """
     True if `challenger` outranks `incumbent` for the same slot.
