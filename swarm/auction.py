@@ -32,35 +32,30 @@ def runAuction(agents: list[Agent],
                targets_by_id: dict[int, Target],
                max_rounds=500) -> AuctionResult:
     """
-    Run synchronous auction rounds until no agent's table changes.
-
-    Each round, every agent bids against its own table, broadcasts it to its
-    neighbours, then merges what it received and releases any slot it lost.
+    Run synchronous rounds until no agent's winners, census or
+    versions change (checked by an outside observer, not the agents).
 
     Args:
-        agents: Agents with empty winners tables. Mutated in place; use fresh
-            agents for each run.
-        channel: Delivers tables between neighbours. Its topology must be
-            connected, or agents in different components never agree.
-        slots_by_role: Slots grouped by required role, shared by all agents.
-        targets_by_id: Lookup from target_id to Target, used for scoring.
-        max_rounds: Safety cap. Convergence normally takes at most
-            (number of slots) x (network diameter) rounds.
+        agents: Fresh agents; mutated in place.
+        channel: Delivers packets between neighbours; must be connected.
+        slots_by_role: Slots grouped by required role.
+        targets_by_id: Lookup from target_id to Target.
+        max_rounds: Safety cap.
 
-    Returns: AuctionResult with the agreed winners table, each agent's slot,
-        the total score, the number of slots filled, and the rounds taken.
-    Raises: RuntimeError: If tables are still changing after max_rounds.
+    Returns: AuctionResult (winners, assignment, total, filled, rounds).
+    Raises: RuntimeError if still changing after max_rounds.
     """
 
     for t in range(1, max_rounds + 1):
-        before = [dict(a.winners) for a in agents]
+        before = [(dict(a.winners), dict(a.census), dict(a.latest))
+                  for a in agents]
         runRound(t, agents, channel, slots_by_role, targets_by_id)
-        if all(a.winners == b for a, b in zip(
-                agents, before)):                        # no changes were made this round
+        if all((a.winners, a.census, a.latest) == b for a, b in zip(
+                agents, before)):                                    # no changes were made this round
             slots_by_id = {a.config.agent_id: a.slot for a in agents}
-            score = auctionTotal(before[0])
+            score = auctionTotal(before[0][0])
             return AuctionResult(rounds=t,
-                                 winners=before[0],
+                                 winners=before[0][0],
                                  assignment=slots_by_id,
                                  total=score[0],
                                  filled=score[1])
