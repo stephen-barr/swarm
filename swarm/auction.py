@@ -5,7 +5,8 @@ from swarm.models import AuctionResult, Payload, Role, Slot, Winners
 
 def runRound(t: int, agents: list[Agent], channel: Channel[Payload],
              slots_by_role, targets_by_id) -> None:
-    """All agents bid, then all send, then all receive.
+    """
+    All agents bid, then all send, then all receive.
     Each phase happens in the same time period for every agent, so message 
     reflects bids made this round. The assumption is synchronous rounds.
     """
@@ -19,11 +20,26 @@ def runRound(t: int, agents: list[Agent], channel: Channel[Payload],
     channel.endStep()
 
 
-def auctionTotal(
+def weightedTotal(
     winners: Winners
 ) -> tuple[float,
            int]:        # Returns (sum of winning scores, number of slots filled)
     return sum(bid.score for bid in winners.values()), len(winners)
+
+
+def rawTotal(agents: list[Agent],
+             targets_by_id: dict[int, Target]) -> tuple[float, int]:
+    """ 
+    Unweighted score (does not utilize scarcity for score)
+    to compare to baselines.
+    """
+    score = 0.0
+    filled = 0
+    for a in agents:
+        if a.slot is not None:
+            score += a.makeScore(targets_by_id[a.slot.target_id])
+            filled += 1
+    return score, filled
 
 
 def runAuction(agents: list[Agent],
@@ -53,7 +69,7 @@ def runAuction(agents: list[Agent],
         if all((a.winners, a.census, a.latest) == b for a, b in zip(
                 agents, before)):                                    # no changes were made this round
             slots_by_id = {a.config.agent_id: a.slot for a in agents}
-            score = auctionTotal(before[0][0])
+            score = rawTotal(agents=agents, targets_by_id=targets_by_id)
             return AuctionResult(rounds=t,
                                  winners=before[0][0],
                                  assignment=slots_by_id,

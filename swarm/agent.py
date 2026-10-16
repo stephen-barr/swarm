@@ -124,10 +124,10 @@ class Agent:
                             slot, LOSES_TO_ALL
                         )                             # a slot that is not yet assigned is given LOSES_TO_ALL
                 ) and bid.version >= self.latest.get(
-                        bid.agent, 0
+                        bid.agent_id, 0
                 ):                                    # check that the new message is more recent than the most recent message                                    # update only the slots that have changed or are not yet present
                     self.winners[slot] = bid
-                    self.latest[bid.agent] = bid.version
+                    self.latest[bid.agent_id] = bid.version
                     self.latest_to_share = True       # flag that latest needs to be shared
                     changed = True
         return changed
@@ -175,7 +175,7 @@ class Agent:
                     self.latest_to_share = True       # set flag to share latest
         if changed_versions:
             for s, b in list(self.winners.items()):
-                if b.agent in changed_versions:
+                if b.agent_id in changed_versions:
                     self.winners.pop(
                         s)                            # delete any winners with more recent messages
         return changed
@@ -212,7 +212,7 @@ class Agent:
         return {
             s:
             Bid(score=scores[s.target_id] * w,
-                agent=self.config.agent_id,
+                agent_id=self.config.agent_id,
                 version=self.latest[self.config.agent_id])
             for role, w in role_to_weight.items()
             for s in slots_by_role[role]
@@ -244,14 +244,14 @@ class Agent:
 
         self.winners[best_slot] = Bid(
             score=contenders[best_slot].score,
-            agent=self.config.agent_id,
+            agent_id=self.config.agent_id,
             version=self.latest[self.config.agent_id]
         )                                             # write the agent as the winner to the best slot
         self.slot = best_slot                         # assign myself the new slot
 
     def consensusPhase(self):
         if self.slot is None: return        # if unassigned, nothing to do
-        bid_agent_id = self.winners[self.slot].agent
+        bid_agent_id = self.winners[self.slot].agent_id
         if bid_agent_id != self.config.agent_id:
             self.slot = None                # if outbid on slot, release slot internally
             return

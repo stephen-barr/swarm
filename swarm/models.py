@@ -90,7 +90,7 @@ class AgentConfig:
 
 class Bid(NamedTuple):
     score: float
-    agent: int
+    agent_id: int
     version: int
 
 
