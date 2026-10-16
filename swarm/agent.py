@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
@@ -54,7 +55,10 @@ class Target:
 
 class Agent:
 
-    def __init__(self, config: AgentConfig, agent_position: PositionEstimate):
+    def __init__(self,
+                 config: AgentConfig,
+                 agent_position: PositionEstimate,
+                 scarcity_k: float = 0.0):
         if agent_position.frame is not Frame.GLOBAL:
             raise ValueError(
                 f"agent {config.agent_id} needs a global-frame position"
@@ -64,13 +68,31 @@ class Agent:
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
         self.inbox: list[Message[Payload]] = []
         self.winners: Winners = {}                                       # {slot : bid}
-        self.census: dict[int, AgentConfig] = {
+
+        ### Census
+        caps = list(config.capabilities)    # make a list of capabilities
+        self.my_roles = [
+            frozenset(c) for r in
+            range(1,
+                  len(caps) +
+                  1)                        # make a list of every combination of roles one possesses
+            for c in combinations(caps, r)
+        ]
+
+        self.census: dict[int, AgentConfig] = {       # agent config of every agent
             config.agent_id: config
-        }                                                                # agent config of every agent
+        }
+        self.capability_count: dict[Role, int] = {
+            r: 1
+            for r in self.my_roles
+        }                                             # count of observed number of roles for scoring
+        self.census_to_share: bool = True             # true if agent's table has changed since last sent
+        self.scarcity_k = scarcity_k                  # how much do you weight the scarcity scoring
+
+        ### Latest
         self.latest: Latest = {
             config.agent_id: 0
-        }                                                                # dict of agent_id : version pairs
-        self.census_to_share: bool = True                                # true if agent's table has changed since last sent
+        }                         # dict of agent_id : version pairs
         self.latest_to_share: bool = True
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
@@ -120,8 +142,14 @@ class Agent:
             if m.payload.census is None:
                 continue
             for agent_id, agent_config in m.payload.census.items():
-                if agent_id not in self.census:
-                    self.census[agent_id] = agent_config
+                if agent_id not in self.census:                                    # agent configs are only added at most once and not changed
+                    self.census[
+                        agent_id] = agent_config                                   # add the config to the census
+                    overlap = self.config.capabilities & agent_config.capabilities # intersection of your capabilities and their capabilities
+                    for r in self.capability_count:
+                        if r <= overlap:
+                            self.capability_count[
+                                r] += 1                                            # increment the count of the role for small n scoring
                     changed = True
                     self.census_to_share = True
         return changed
@@ -165,19 +193,29 @@ class Agent:
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],
             targets_by_id: dict[int, Target]) -> dict[Slot, Bid]:
+
+        # score all of the targets by id
         scores = {
             t_id: self.makeScore(target)
             for t_id, target in targets_by_id.items()
-        }                                             # score all of the targets by id
+        }
 
-        ### score only the slots that agent can meet requirements
+        ### scarcity weight for each role this agent can fill
+        role_to_weight = {
+            role:
+            math.exp(-self.scarcity_k * self.capability_count[role] /
+                     len(self.census))
+            for role in slots_by_role if role <= self.config.capabilities
+        }
+
+        ### one weighted bid per slot of an eligible role
         return {
             s:
-            Bid(score=scores[s.target_id],
+            Bid(score=scores[s.target_id] * w,
                 agent=self.config.agent_id,
                 version=self.latest[self.config.agent_id])
-            for required, role_slots in slots_by_role.items()
-            if required <= self.config.capabilities for s in role_slots
+            for role, w in role_to_weight.items()
+            for s in slots_by_role[role]
         }
 
     def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
