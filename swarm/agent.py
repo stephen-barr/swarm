@@ -72,7 +72,6 @@ class Agent:
         }                                                                # dict of agent_id : version pairs
         self.census_to_share: bool = True                                # true if agent's table has changed since last sent
         self.latest_to_share: bool = True
-        self.version: int = 0                                            # version number dictates rebids, only changes
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
         census = None
@@ -176,7 +175,7 @@ class Agent:
             s:
             Bid(score=scores[s.target_id],
                 agent=self.config.agent_id,
-                version=self.version)
+                version=self.latest[self.config.agent_id])
             for required, role_slots in slots_by_role.items()
             if required <= self.config.capabilities for s in role_slots
         }
@@ -195,16 +194,22 @@ class Agent:
         if not contenders:
             return                                                      # no assignments for the agent
 
+        self.latest[
+            self.config.
+            agent_id] += 1                  # increment agent version by one (you are sending a new message)
+        self.latest_to_share = True         # set flag to true as your own version changed
+
         best_slot: Slot = max(
             contenders,
             key=lambda s: (contenders[s].score, s.target_id, s.rank)
         )                                                            # best slot by score; ties go to the higher target_id, then the higher rank
+
         self.winners[best_slot] = Bid(
             score=contenders[best_slot].score,
             agent=self.config.agent_id,
-            version=self.version
-        )                                                            # write the agent as the winner to the best slot
-        self.slot = best_slot                                        # assign myself the new slot
+            version=self.latest[self.config.agent_id]
+        )                                             # write the agent as the winner to the best slot
+        self.slot = best_slot                         # assign myself the new slot
 
     def consensusPhase(self):
         if self.slot is None: return        # if unassigned, nothing to do
