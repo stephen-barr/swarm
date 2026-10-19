@@ -4,10 +4,10 @@ import pytest
 
 from swarm.agent import buildSlots, groupSlots, indexTargets
 from swarm.models import Capability, Message, Payload, role
-from swarm.scenarios import at, make_agent, make_target
+from swarm.scenarios import at, make_agent, make_target, solve
 
-A = Capability.SURVEILLANCE
-B = Capability.MAPPING
+S = Capability.SURVEILLANCE
+M = Capability.MAPPING
 
 
 def census_msg(configs, sender=1, receiver=0):
@@ -23,10 +23,9 @@ def census_msg(configs, sender=1, receiver=0):
 def agent_with_census(my_caps, others_caps, k):
     """Agent 0 at the origin with scarcity k, after learning the configs of
     drones 1, 2, ... whose capabilities are given by others_caps."""
-    a = make_agent(0, my_caps, 0, 0)
-    a.scarcity_k = k
+    a = make_agent(0, my_caps, 0, 0, scarcity_k=k)
     others = [
-        make_agent(i + 1, caps, 0, 0).config
+        make_agent(i + 1, caps, 0, 0, scarcity_k=k).config
         for i, caps in enumerate(others_caps)
     ]
     a.updateCensus([census_msg(others)])
@@ -44,13 +43,13 @@ def setup(targets):
 @pytest.mark.parametrize(
     "others_caps, n",
     [
-        ([[B], [B], [B]], 1),     # only agent 0 can fill {A}
-        ([[A], [A], [A]], 4),     # everyone can fill {A}
+        ([[M], [M], [M]], 1),     # only agent 0 can fill {M}
+        ([[S], [S], [S]], 4),     # everyone can fill {S}
     ])
 def test_weight_is_exp_minus_k_n_over_N(others_caps, n):
     k = 2.0
-    a = agent_with_census([A], others_caps, k)
-    target = make_target(0, at(100, 0), 0.5, {role(A): {1: 1.0}})
+    a = agent_with_census([S], others_caps, k)
+    target = make_target(0, at(100, 0), 0.5, {role(S): {1: 1.0}})
     slots_by_role, targets_by_id = setup([target])
 
     bids = a.bid(slots_by_role, targets_by_id)
@@ -58,7 +57,7 @@ def test_weight_is_exp_minus_k_n_over_N(others_caps, n):
     raw = a.makeScore(target)
     N = len(a.census)
 
-    assert a.capability_count[role(A)] == n
+    assert a.capability_count[role(S)] == n
     assert b.score == pytest.approx(raw * math.exp(-k * n / N))
     assert N == 4
 
@@ -73,13 +72,13 @@ def test_weight_is_exp_minus_k_n_over_N(others_caps, n):
         (2.0, 1),                                     # weighted: the scarce target wins
     ])
 def test_versatile_drone_takes_scarce_slot_when_weighted(k, expected_target):
-    a = agent_with_census([A, B], [[A], [A], [A]],
-                          k)                          # {B} is scarce: only agent 0
+    a = agent_with_census([S, M], [[S], [S], [S]],
+                          k)                          # {M} is scarce: only agent 0
     targets = [
-        make_target(0, at(100, 0), 0.50, {role(A): {
+        make_target(0, at(100, 0), 0.50, {role(S): {
                                               1: 1.0
                                           }}),        # common role
-        make_target(1, at(0, 100), 0.45, {role(B): {
+        make_target(1, at(0, 100), 0.45, {role(M): {
                                               1: 1.0
                                           }}),        # scarce role, same distance
     ]
@@ -89,3 +88,42 @@ def test_versatile_drone_takes_scarce_slot_when_weighted(k, expected_target):
 
     assert a.slot is not None
     assert a.slot.target_id == expected_target
+
+
+@pytest.mark.parametrize(
+    "k, filled, drone0_role, drone1_filled",
+    [
+        (
+            0.0, 1, role(S), False
+        ),                                               # plain CBAA: drone 0 takes the valuable SURVEILLANCE slot, MAPPING stays empty
+        (2.0, 2, role(M),
+         True),                                          # re-scoring: drone 0 moves to the scarce MAPPING slot
+    ])
+def test_rescoring_moves_versatile_drone_to_scarce_slot(
+        k, filled, drone0_role, drone1_filled):
+    targets = [
+        make_target(0, at(100.0, 0.0), 0.8,
+                    {role(S): {
+                         1: 1.0
+                     }}),                                # common role, valuable, close to drone 0
+        make_target(1, at(0.0, 300.0), 0.5,
+                    {role(M): {
+                         1: 1.0
+                     }}),                                # scarce role: only drone 0 can fill it
+    ]
+    agents = [
+        make_agent(0, {S, M}, 50.0, 0.0, scarcity_k=k),  # the versatile drone
+        make_agent(1, {S}, 400.0, 0.0,
+                   scarcity_k=k),                        # specialists, farther from target 0
+        make_agent(2, {S}, 450.0, 50.0, scarcity_k=k),
+        make_agent(3, {S}, 450.0, -50.0, scarcity_k=k),
+    ]
+
+    auction_results = solve(agents=agents, targets=targets)
+    assert auction_results.filled == filled
+    assert agents[0].slot is not None
+    assert agents[0].slot.required == drone0_role
+    assert (agents[1].slot is not None) == drone1_filled
+    if drone1_filled:
+        assert agents[1].slot is not None
+        assert agents[1].slot.required == role(S)
