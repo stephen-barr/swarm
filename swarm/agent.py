@@ -88,6 +88,7 @@ class Agent:
         }                                             # count of observed number of roles for scoring
         self.census_to_share: bool = True             # true if agent's table has changed since last sent
         self.scarcity_k = scarcity_k                  # how much do you weight the scarcity scoring
+        self.reconsider: bool = False                 # ensures the auction does not take an early exit when k != 0
 
         ### Latest
         self.latest: Latest = {
@@ -113,7 +114,7 @@ class Agent:
         """
         Merge neighbours' tables into this agent's own, slot by slot.
         For each slot, keep whichever bid wins under beats(). 
-        Checks if the new bid has a higher version than the old.
+        Rejects bids older than last known message.
         """
         changed = False
         for m in messages:                            # messages for agent is sorted by agent and time
@@ -125,10 +126,11 @@ class Agent:
                         )                             # a slot that is not yet assigned is given LOSES_TO_ALL
                 ) and bid.version >= self.latest.get(
                         bid.agent_id, 0
-                ):                                    # check that the new message is more recent than the most recent message                                    # update only the slots that have changed or are not yet present
+                ):                                    # check that the new message is at least as recent as the last message                                    # update only the slots that have changed or are not yet present
+                    if bid.version > self.latest.get(bid.agent_id, 0):
+                        self.latest_to_share = True   # flag that latest needs to be shared
                     self.winners[slot] = bid
                     self.latest[bid.agent_id] = bid.version
-                    self.latest_to_share = True       # flag that latest needs to be shared
                     changed = True
         return changed
 
@@ -220,8 +222,8 @@ class Agent:
 
     def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
                      targets_by_id: dict[int, Target]) -> None:
-        if self.slot is not None:
-            return                                                      # already assigned
+        if self.slot is not None and not self.reconsider:
+            return                                                      # already assigned and not reconsidering
         bids = self.bid(slots_by_role, targets_by_id)
         contenders: dict[Slot, Bid] = {
             s: b
@@ -229,24 +231,36 @@ class Agent:
                 b,                                                      # only consider slots that are not filled
                 self.winners[s])                                        # OR slots that agent can win.
         }
-        if not contenders:
-            return                                                      # no assignments for the agent
+        if self.slot is not None:
+            contenders[self.slot] = bids[
+                self.slot]                                              # if agent has a slot add it to contenders
 
-        self.latest[
-            self.config.
-            agent_id] += 1                  # increment agent version by one (you are sending a new message)
-        self.latest_to_share = True         # set flag to true as your own version changed
+        if not contenders:
+            return      # no assignments for the agent
 
         best_slot: Slot = max(
             contenders,
             key=lambda s: (contenders[s].score, s.target_id, s.rank)
         )                                                            # best slot by score; ties go to the higher target_id, then the higher rank
 
+        if self.slot is not None and best_slot == self.slot and contenders[
+                best_slot].score == self.winners[self.slot].score:
+            return      # if the best slot is already owned by you simply return and transmit nothing
+
+        self.latest[
+            self.config.
+            agent_id] += 1                  # increment agent version by one (you are sending a new message)
+        self.latest_to_share = True         # set flag to true as your own version changed
+
         self.winners[best_slot] = Bid(
             score=contenders[best_slot].score,
             agent_id=self.config.agent_id,
             version=self.latest[self.config.agent_id]
         )                                             # write the agent as the winner to the best slot
+        if self.slot is not None and self.slot != best_slot:
+            self.winners.pop(
+                self.slot
+            )                                         # remove yourself from the old slot only if you are filling a new slot
         self.slot = best_slot                         # assign myself the new slot
 
     def consensusPhase(self):
@@ -257,10 +271,11 @@ class Agent:
             return
 
     def receieve(self, messages: list[Message[Payload]]):
-        self.updateCensus(messages)
+        census_grew = self.updateCensus(messages)
         self.mergeLatest(messages)
-        self.updateWinners(messages)        # update winners from message list
-        self.consensusPhase()               # check if you are still assigned
+        self.updateWinners(messages)                           # update winners from message list
+        self.consensusPhase()                                  # check if you are still assigned
+        self.reconsider = census_grew and self.scarcity_k != 0 # if the census grew you must reconsider next round, if k=0 default to standard CBAA
 
 
 ### comparison between two agents
