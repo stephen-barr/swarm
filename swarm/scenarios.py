@@ -81,11 +81,11 @@ def make_agent(agent_id,
                capabilities,
                x,
                y,
+               scarcity_k=0.0,
                platform=PlatformClass.GROUP_1_MULTIROTOR):
-    return Agent(
-        AgentConfig(agent_id, platform, frozenset(capabilities)),
-        at(x, y),
-    )
+    return Agent(AgentConfig(agent_id, platform, frozenset(capabilities)),
+                 at(x, y),
+                 scarcity_k=scarcity_k)
 
 
 def make_target(target_id, position, threat, requirements):
@@ -126,6 +126,7 @@ def random_instance(
         n_agents=6,
         n_targets=3,
         max_role_size=1,
+        scarcity_k=0.0,
         multiple_slots_per_target=True) -> tuple[list[Agent], list[Target]]:
     """
     Build a random set of agents and targets for testing.
@@ -161,8 +162,10 @@ def random_instance(
         ) for t in range(n_targets)
     ]
     agents = [
-        make_agent(a, rng.sample(caps, rng.randint(1, 3)),
-                   rng.uniform(-500, 500), rng.uniform(-500, 500))
-        for a in range(n_agents)
+        make_agent(a,
+                   rng.sample(caps, rng.randint(1, 3)),
+                   rng.uniform(-500, 500),
+                   rng.uniform(-500, 500),
+                   scarcity_k=scarcity_k) for a in range(n_agents)
     ]
     return agents, targets
