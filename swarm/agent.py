@@ -1,6 +1,8 @@
 """
 One agent's auction methods.
-Only uses agent's position (to make a score) and winners table (to bid).
+Agent uses winners table (a dict of slots: bids), census (list of other agents
+capabilities) and latest (agent_id : highest message version).
+Note that targets are assumed to be known by all and thus not distributed.
 
 """
 
@@ -162,7 +164,7 @@ class Agent:
         """
 
         changed = False
-        changed_versions = set()
+        changed_versions = set()                               # set of agent_ids that changed versions
         for m in messages:
             if m.payload.latest is None:
                 continue
@@ -170,16 +172,16 @@ class Agent:
                 if agent_id not in self.latest or self.latest[
                         agent_id] < new_version:
                     self.latest[
-                        agent_id] = new_version       # if the agent id hasnt been heard from yet, or the version is newer add version to latest
+                        agent_id] = new_version                # if the agent id hasnt been heard from yet, or the version is newer add version to latest
                     changed_versions.add(
-                        agent_id)                     # add it to the list of agents to change
+                        agent_id)                              # add it to the list of agents to change
                     changed = True
-                    self.latest_to_share = True       # set flag to share latest
+                    self.latest_to_share = True                # set flag to share latest
         if changed_versions:
             for s, b in list(self.winners.items()):
                 if b.agent_id in changed_versions:
                     self.winners.pop(
-                        s)                            # delete any winners with more recent messages
+                        s)                                     # delete any winners with more recent messages
         return changed
 
     def makeScore(
@@ -201,12 +203,19 @@ class Agent:
             t_id: self.makeScore(target)
             for t_id, target in targets_by_id.items()
         }
+        # total number of slots for the auction
+        total_slots = sum(len(slots) for slots in slots_by_role.values())
 
-        ### scarcity weight for each role this agent can fill
+        # number of drones agent knows of / number of slots
+        drones_slot_ratio = len(self.census) / total_slots
+
+        ### scarcity weight for each role this agent can fill. Calculated as a ratio of
+        ### the scarcity of the number of drones per role, relative to the swarm average
         role_to_weight = {
             role:
-            math.exp(-self.scarcity_k * self.capability_count[role] /
-                     len(self.census))
+            math.exp(-self.scarcity_k *
+                     (self.capability_count[role] / len(slots_by_role[role])) /
+                     drones_slot_ratio)
             for role in slots_by_role if role <= self.config.capabilities
         }
 

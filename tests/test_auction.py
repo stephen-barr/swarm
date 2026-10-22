@@ -1,7 +1,6 @@
 import pytest
 
-from swarm.agent import indexTargets
-from swarm.auction import rawTotal, weightedTotal
+from swarm.auction import weightedTotal
 from swarm.baselines import greedyBaseline, solveHungarian
 from swarm.models import (
     Capability,
