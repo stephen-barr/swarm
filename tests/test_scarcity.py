@@ -1,5 +1,6 @@
 import math
 
+import numpy as np
 import pytest
 
 from swarm.agent import buildSlots, groupSlots, indexTargets
@@ -127,3 +128,34 @@ def test_rescoring_moves_versatile_drone_to_scarce_slot(
     if drone1_filled:
         assert agents[1].slot is not None
         assert agents[1].slot.required == role(S)
+
+
+def test_weight_accounts_for_demand():
+    k = 2.0
+    a = agent_with_census([S, M], [[S], [M], [S, M]], k)
+    targets = [
+        make_target(0, at(100, 0), 0.5, {role(S): {
+                                             1: 1.0
+                                         }}),         # 1 slot
+        make_target(1, at(0, 100), 0.5, {role(M): {
+                                             3: 1.0
+                                         }}),         # 3 slots
+    ]
+    slots_by_role, targets_by_id = setup(targets)
+    bids = a.bid(slots_by_role, targets_by_id)
+
+    def weight(r):
+        """The scarcity weight on role r's first slot: weighted bid / raw score."""
+        slot = slots_by_role[r][0]
+        return bids[slot].score / a.makeScore(targets_by_id[slot.target_id])
+
+    n = {r: a.capability_count[r] for r in (role(S), role(M))} # supply
+    d = {r: len(slots_by_role[r]) for r in (role(S), role(M))} # demand
+    N = len(a.census)
+    D = sum(len(slots) for slots in slots_by_role.values())
+
+    assert weight(role(S)) == pytest.approx(
+        np.exp(-k * (n[role(S)] / d[role(S)]) / (N / D)))
+    assert weight(role(M)) == pytest.approx(
+        np.exp(-k * (n[role(M)] / d[role(M)]) / (N / D)))
+    assert weight(role(M)) > weight(role(S))
