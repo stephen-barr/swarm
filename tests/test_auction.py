@@ -209,3 +209,24 @@ def test_raw_is_equal_to_weighted_when_k_is_zero(seed, graph):
     weighted_total, weighted_filled = weightedTotal(auction_results.winners)
     assert raw_total == pytest.approx(weighted_total)
     assert raw_filled == weighted_filled
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("k", [0.1, 1.0])
+@pytest.mark.parametrize("seed", range(40))
+def test_tables_consistent_with_scarcity(seed, k, graph):
+    """Larger instances with scarcity weighting, where drones lose and switch slots."""
+    agents, targets = random_instance(seed,
+                                      n_agents=12,
+                                      n_targets=6,
+                                      max_role_size=2,
+                                      scarcity_k=k)
+    solve(agents, targets, graph)
+    table = agents[0].winners
+    holders = {a.config.agent_id: a.slot for a in agents}
+    for a in agents[1:]:
+        assert a.winners == table, "tables disagree"
+    for slot, bid in table.items():
+        assert holders[
+            bid.
+            agent_id] == slot, "table names a winner that does not hold the slot"

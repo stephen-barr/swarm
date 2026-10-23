@@ -277,6 +277,8 @@ class Agent:
         bid_agent_id = self.winners[self.slot].agent_id
         if bid_agent_id != self.config.agent_id:
             self.slot = None                # if outbid on slot, release slot internally
+            self.latest[self.config.agent_id] += 1  # if outbid flag latest to let other agents know
+            self.latest_to_share = True
             return
 
     def receieve(self, messages: list[Message[Payload]]):
