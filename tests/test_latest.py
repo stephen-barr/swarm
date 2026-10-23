@@ -107,3 +107,21 @@ def test_stale_bid_echoed_back_is_rejected():
     a.latest.update({3: 2, 5: 1})
     a.receieve([msg(1, {S: Bid(0.8, 3, 1)})])
     assert a.winners[S] == Bid(0.7, 5, 1)
+
+
+def test_lost_bid_echoed_back_is_rejected():
+    """Drone 0 holds S, is outbid by drone 5, drone 5 then moves on, and a
+    neighbour that never saw drone 5's bid echoes drone 0's old bid back.
+    Drone 0 is unassigned, so its old bid must not return to its table."""
+    a = make_agent(0, [A], 0, 0)
+    a.winners[S] = Bid(0.5, 0, 0)
+    a.slot = S
+
+    a.receieve([msg(1, {S: Bid(0.9, 5, 1)}, latest={5: 1})]) # outbid
+    assert a.slot is None
+
+    a.receieve([msg(1, {}, latest={5: 2})])           # drone 5 moves on
+    assert S not in a.winners
+
+    a.receieve([msg(2, {S: Bid(0.5, 0, 0)})])         # stale echo
+    assert S not in a.winners
