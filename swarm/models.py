@@ -2,6 +2,7 @@
 Contains all of the types imported by other modules. No logic.
 """
 
+import math
 import sys
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -11,6 +12,8 @@ ThreeVector = tuple[float, float, float]
 Covariance = tuple[ThreeVector, ThreeVector,
                    ThreeVector]                       # 3x3 covariance matrix
 CountDistribution = dict[int, float]                  # distribution of agent needs per target
+
+_g = 9.81
 
 
 class Frame(Enum):
@@ -32,36 +35,130 @@ class PositionEstimate:
 
 
 @dataclass(frozen=True)
+class AgentState:
+    """Vehicles state as a """
+    estimate: PositionEstimate
+    bank: float = 0.0   # radians; fixed-wing only, 0 for multirotors
+
+
+@dataclass(frozen=True)
 class PlatformSpec:
     """
     Cruise_speed is currently used.
     All other attributes are for later selection of tasks.
     """
-    mass_kg: float      # mass of platform
-    cruise_speed: float
-    max_altitude: int   # max_altitude
-    endurance_s: float  # endurance in seconds
-    can_hover: bool
+    mass_kg: float                # mass of platform
+    v_min: float                  # minimum velocity, 0 if can_hover
+    v_cruise: float               # cruise speed, previously cruise_speed
+    v_max: float                  # max speed
+    a_max: float                  # max acceleration (speeding up)
+    a_min: float                  # max negative acceleration (slowing down)
+    max_bank: float               # maximum bank in degrees
+    max_altitude: int             # max_altitude
+    endurance_s: float            # endurance in seconds
+    max_roll_rate: float          # deg/s maximum roll rate estimated from wingspan, assumed constant
+
+    @property
+    def can_hover(self):
+        """If the minimum velocity is zero, the agent, by definition, can hover."""
+        return self.v_min == 0.0
+
+    @property
+    def max_lateral_accel(self) -> float:
+        """Maximum acceleration to turn. Derived from maximum bank angle."""
+        return _g * math.tan(math.radians(self.max_bank))
+
+    @property
+    def loiter_speed(self) -> float:
+        """
+        Rule of thumb tolerance of 1.25.
+        Can be changed, but must be sufficiently above v_min.
+        Good balance of saving fuel and being far enough from min.
+        """
+        return 1.25 * self.v_min
+
+    @property
+    def tau(self) -> float:
+        """
+        Returns time characteristic. 
+        I.e. how many seconds to correct velocity error in harmonic system.
+        """
+        return self.max_bank / self.max_roll_rate
+
+    @property
+    def loiter_radius(self) -> float:
+        """
+        Smallest radius that can be flow in, calculated from max_lateral_accel.
+        Tolerance is given as 1.4, rule of thumb, can be changed, but needs tolerance. """
+        return 1.4 * self.loiter_speed * self.loiter_speed / self.max_lateral_accel
 
 
 ### Specifying possible drone classes
 class PlatformClass(Enum):
     """
-    Units: kg, m/s, ft, s
-    Altitudes are given by drone group ceilings in ft
-    All specs are given as an example
+    Example specs per DoD UAS group. Speed envelopes follow public figures for the
+    named aircraft; acceleration limits are engineering estimates.
     """
-    GROUP_1_MULTIROTOR = PlatformSpec(2.5, 12.0, 1_200, 35 * 60,
-                                      True)                      # Skydio X2D-like
-    GROUP_1_FIXED_WING = PlatformSpec(1.9, 13.0, 1_200, 90 * 60,
-                                      False)                     # RQ-11 Raven-like
-    GROUP_2 = PlatformSpec(22.0, 25.0, 3_500, 20 * 3600, False)  # ScanEagle-like
-    GROUP_3 = PlatformSpec(210.0, 36.0, 18_000, 8 * 3600,
-                           False)                                # RQ-7 Shadow-like
-    GROUP_4 = PlatformSpec(1_630.0, 55.0, 18_000, 25 * 3600,
-                           False)                                # MQ-1C Gray Eagle-like
-    GROUP_5 = PlatformSpec(4_760.0, 90.0, 50_000, 27 * 3600,
-                           False)                                # MQ-9 Reaper-like
+    GROUP_1_MULTIROTOR = PlatformSpec(mass_kg=2.5,
+                                      v_min=0.0,
+                                      v_cruise=12.0,
+                                      v_max=16.0,
+                                      a_max=5.0,
+                                      a_min=-5.0,
+                                      max_bank=27.0,
+                                      max_altitude=1_200,
+                                      max_roll_rate=300.0,
+                                      endurance_s=35 * 60) # Skydio X2D-like
+    GROUP_1_FIXED_WING = PlatformSpec(mass_kg=1.9,
+                                      v_min=9.0,
+                                      v_cruise=13.0,
+                                      v_max=22.0,
+                                      a_max=2.0,
+                                      a_min=-1.5,
+                                      max_bank=45.0,
+                                      max_altitude=1_200,
+                                      max_roll_rate=75,
+                                      endurance_s=90 * 60) # RQ-11 Raven-like
+    GROUP_2 = PlatformSpec(mass_kg=22.0,
+                           v_min=18.0,
+                           v_cruise=25.0,
+                           v_max=41.0,
+                           a_max=1.0,
+                           a_min=-1.0,
+                           max_bank=35.0,
+                           max_altitude=3_500,
+                           max_roll_rate=65,
+                           endurance_s=20 * 3600)          # ScanEagle-like
+    GROUP_3 = PlatformSpec(mass_kg=210.0,
+                           v_min=25.0,
+                           v_cruise=36.0,
+                           v_max=56.0,
+                           a_max=1.0,
+                           a_min=-0.8,
+                           max_bank=30.0,
+                           max_altitude=18_000,
+                           max_roll_rate=70,
+                           endurance_s=8 * 3600)           # RQ-7 Shadow-like
+    GROUP_4 = PlatformSpec(mass_kg=1_630.0,
+                           v_min=30.0,
+                           v_cruise=55.0,
+                           v_max=77.0,
+                           a_max=0.8,
+                           a_min=-0.8,
+                           max_bank=30.0,
+                           max_altitude=18_000,
+                           max_roll_rate=19,
+                           endurance_s=25 * 3600)          # MQ-1C Gray Eagle-like
+    GROUP_5 = PlatformSpec(mass_kg=4_760.0,
+                           v_min=45.0,
+                           v_cruise=90.0,
+                           v_max=123.0,
+                           a_max=1.0,
+                           a_min=-1.0,
+                           max_bank=30.0,
+                           max_altitude=50_000,
+                           max_roll_rate=26,
+                           endurance_s=27 * 3600)          # MQ-9 Reaper-like
 
 
 class Capability(Enum):
@@ -138,6 +235,30 @@ class Message(Generic[P]):
     @property
     def deliveryStep(self) -> int:
         return self.send_step + self.message_delay    # using constant delayed model for now
+
+
+@dataclass
+class Target:
+    target_id: int                          # id for target
+    target_position: PositionEstimate       # position estimate of target
+    threat_level: float                     # how dangerous is this target to my side
+    threat_char_time: float                 # time in seconds for the value V of a target to be V/e.
+    requirement_distribution: dict[
+        Role,
+        CountDistribution]                  # what is the estimated probability you need any number of a certain class of drones
+
+    def mostLikely(self) -> dict[Role, int]:
+        """
+        Function takes in a requirement distribution and naively returns the mode.
+        Slots must be integer valued, expectation would return float. The tie 
+        breaker is the greater number. To be replaced when incorporating bayesian
+        model.
+        """
+        most_likely = {
+            role_: max(distribution, key=lambda n: (distribution[n], n))
+            for role_, distribution in self.requirement_distribution.items()
+        }                                                                    # return a dict of the mode of the needs per capability of a distribution
+        return most_likely
 
 
 @dataclass(frozen=True)
