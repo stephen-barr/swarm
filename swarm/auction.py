@@ -1,6 +1,6 @@
-from swarm.agent import Agent, Target
+from swarm.agent import Agent
 from swarm.comms import Channel
-from swarm.models import AuctionResult, Payload, Role, Slot, Winners
+from swarm.models import AuctionResult, Payload, Role, Slot, Target, Winners
 
 
 def runRound(t: int, agents: list[Agent], channel: Channel[Payload],

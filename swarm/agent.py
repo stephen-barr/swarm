@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from dataclasses import dataclass
 from itertools import combinations
 
 import numpy as np
@@ -19,7 +18,6 @@ from swarm.models import (
     LOSES_TO_ALL,
     AgentConfig,
     Bid,
-    CountDistribution,
     Frame,
     Latest,
     Message,
@@ -27,58 +25,36 @@ from swarm.models import (
     PositionEstimate,
     Role,
     Slot,
+    Target,
     Winners,
 )
 
 
-@dataclass
-class Target:
-    target_id: int                          # id for target
-    target_position: PositionEstimate       # position estimate of target
-    threat_level: float                     # how dangerous is this target to my side
-    threat_char_time: float                 # time in seconds for the value V of a target to be V/e.
-    requirement_distribution: dict[
-        Role,
-        CountDistribution]                  # what is the estimated probability you need any number of a certain class of drones
-
-    def mostLikely(self) -> dict[Role, int]:
-        """
-        Function takes in a requirement distribution and naively returns the mode.
-        Slots must be integer valued, expectation would return float. The tie 
-        breaker is the greater number. To be replaced when incorporating bayesian
-        model.
-        """
-        most_likely = {
-            role_: max(distribution, key=lambda n: (distribution[n], n))
-            for role_, distribution in self.requirement_distribution.items()
-        }                                                                    # return a dict of the mode of the needs per capability of a distribution
-        return most_likely
-
-
 class Agent:
 
-    def __init__(self,
-                 config: AgentConfig,
-                 agent_position: PositionEstimate,
-                 scarcity_k: float = 0.0):
+    def __init__(
+            self,
+            config: AgentConfig,
+            agent_position: PositionEstimate,
+            scarcity_k: float = 0.0):                                    # ensure consistency between measurements
+        self.config = config
         if agent_position.frame is not Frame.GLOBAL:
             raise ValueError(
                 f"agent {config.agent_id} needs a global-frame position"
-            )                                                            # ensure consistency between measurements
-        self.config = config
+            )                                                            # ensure agents frame is global
         self.agent_position = agent_position
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
         self.inbox: list[Message[Payload]] = []
         self.winners: Winners = {}                                       # {slot : bid}
-
-        ### Census
-        caps = list(config.capabilities)    # make a list of capabilities
+        self.last_bids: dict[Slot, Bid] = {}
+                                                                         ### Census
+        caps = list(config.capabilities)                                 # make a list of capabilities
         self.my_roles = [
-            frozenset(c) for r in
+            frozenset(cap) for r in
             range(1,
                   len(caps) +
-                  1)                        # make a list of every combination of roles one possesses
-            for c in combinations(caps, r)
+                  1)                                                     # make a list of every combination of roles one possesses
+            for cap in combinations(caps, r)
         ]
 
         self.census: dict[int, AgentConfig] = {       # agent config of every agent
@@ -97,6 +73,9 @@ class Agent:
             config.agent_id: 0
         }                         # dict of agent_id : version pairs
         self.latest_to_share: bool = True
+
+        ### Timing
+        self.mission_time: float = 0.0      # how many seconds have elapsed since the beginning of the mission (auction start)
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
         census = None
@@ -186,13 +165,13 @@ class Agent:
 
     def makeScore(
         self, target: Target
-    ) -> float:                                                          # build a naive weight based on threat level and time to arrival
+    ) -> float:                                                   # build a naive weight based on threat level and time to arrival
         dist = math.dist(self.agent_position.position,
                          target.target_position.position)
-        time_to_arrival = dist / self.config.platform.value.cruise_speed # return the estimated time for the agent to arrive at target
+        time_to_arrival = dist / self.config.platform.value.v_max # return the estimated time for the agent to arrive at target
         score = target.threat_level * np.exp(
             -time_to_arrival / target.threat_char_time
-        )                                                                # use exponential model to lower score as t increases
+        )                                                         # use exponential model to lower score as t increases
         return score
 
     def bid(self, slots_by_role: dict[Role, list[Slot]],
@@ -220,7 +199,7 @@ class Agent:
         }
 
         ### one weighted bid per slot of an eligible role
-        return {
+        bids = {
             s:
             Bid(score=scores[s.target_id] * w,
                 agent_id=self.config.agent_id,
@@ -228,6 +207,9 @@ class Agent:
             for role, w in role_to_weight.items()
             for s in slots_by_role[role]
         }
+
+        self.last_bids = bids     # now used in movement
+        return bids
 
     def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
                      targets_by_id: dict[int, Target]) -> None:
@@ -277,7 +259,9 @@ class Agent:
         bid_agent_id = self.winners[self.slot].agent_id
         if bid_agent_id != self.config.agent_id:
             self.slot = None                # if outbid on slot, release slot internally
-            self.latest[self.config.agent_id] += 1  # if outbid flag latest to let other agents know
+            self.latest[
+                self.config.
+                agent_id] += 1              # if outbid flag latest to let other agents know
             self.latest_to_share = True
             return
 

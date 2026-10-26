@@ -6,7 +6,6 @@ from scipy.sparse.csgraph import shortest_path
 from swarm.agent import (
     Agent,
     AgentConfig,
-    Target,
     buildSlots,
     groupSlots,
     indexTargets,
@@ -22,6 +21,7 @@ from swarm.models import (
     Payload,
     PlatformClass,
     PositionEstimate,
+    Target,
     ThreeVector,
     role,
 )
