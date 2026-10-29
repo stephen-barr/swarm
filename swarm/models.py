@@ -264,13 +264,16 @@ class Target:
 
 @dataclass(frozen=True)
 class AuctionResult:
-    rounds: int
-    winners: Winners    # the agreed table
+    dynamics: bool                # were dynamics considered
+    converged: bool               # did the auction converge
+    rounds: int                   # number of rounds until auction converges
+    winners: Winners              # the agreed table
     assignment: dict[
         int, Slot |
-        None]           # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
-    total: float        # sum of winning scores, compared to optimal baseline
-    filled: int         # counts slots with a winner
+        None]                     # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
+    total: float                  # sum of winning scores, compared to optimal baseline
+    filled: int                   # counts slots with a winner
+    completion_time: float = 0    # total time for mission, set at zero so static examples cooperate.
 
 
 def indexTargets(
@@ -297,6 +300,14 @@ def buildSlots(
     ]
 
 
+def raw_score(
+    spec: PlatformSpec, position: ThreeVector, target: Target
+) -> float:                                                   # naive scoring based on time to arrival, more info in README
+    dist = math.dist(position, target.target_position.position)
+    return target.threat_level * math.exp(
+        -(dist / spec.v_cruise) / target.threat_char_time)
+
+
 @dataclass(frozen=True)
 class MissionData:
     targets_by_id: dict[int, Target]
@@ -305,6 +316,10 @@ class MissionData:
     @classmethod
     def fromTargets(cls, targets: list[Target]):
         return cls(indexTargets(targets), groupSlots(buildSlots(targets)))
+
+    def slotPosition(self, slot: Slot) -> ThreeVector:
+        """Position of the target this slot belongs to."""
+        return self.targets_by_id[slot.target_id].target_position.position
 
 
 MessagesById = dict[int, list[Message]]     # {agent id : [Messages]}
