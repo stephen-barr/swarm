@@ -13,9 +13,12 @@ from itertools import combinations
 
 import numpy as np
 
+from swarm.dynamics import advance
+from swarm.guidance import goToTarget, loiterCommand
 from swarm.models import (
     LOSES_TO_ALL,
     AgentConfig,
+    AgentState,
     Bid,
     Frame,
     Latest,
@@ -26,6 +29,7 @@ from swarm.models import (
     Role,
     Slot,
     Target,
+    ThreeVector,
     Winners,
 )
 
@@ -42,7 +46,7 @@ class Agent:
             raise ValueError(
                 f"agent {config.agent_id} needs a global-frame position"
             )                                                            # ensure agents frame is global
-        self.agent_position = agent_position
+        self.state = AgentState(estimate=agent_position)
         self.slot: Slot | None = None                                    # is this agent assigned to a slot
         self.inbox: list[Message[Payload]] = []
         self.winners: Winners = {}                                       # {slot : bid}
@@ -76,6 +80,9 @@ class Agent:
 
         ### Timing
         self.mission_time: float = 0.0      # how many seconds have elapsed since the beginning of the mission (auction start)
+
+        ### Loiter
+        self.loiter_center: ThreeVector | None = None # in the instance you have no place to be, set a position to loiter around (important for fixed wing only)
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
         census = None
@@ -165,13 +172,13 @@ class Agent:
 
     def makeScore(
         self, target: Target
-    ) -> float:                                                   # build a naive weight based on threat level and time to arrival
-        dist = math.dist(self.agent_position.position,
+    ) -> float:                                                      # build a naive weight based on threat level and time to arrival
+        dist = math.dist(self.state.estimate.position,
                          target.target_position.position)
-        time_to_arrival = dist / self.config.platform.value.v_max # return the estimated time for the agent to arrive at target
+        time_to_arrival = dist / self.config.platform.value.v_cruise # return the estimated time for the agent to arrive at target
         score = target.threat_level * np.exp(
             -time_to_arrival / target.threat_char_time
-        )                                                         # use exponential model to lower score as t increases
+        )                                                            # use exponential model to lower score as t increases
         return score
 
     def bid(self, mission_data: MissionData) -> dict[Slot, Bid]:
@@ -273,7 +280,61 @@ class Agent:
         self.consensusPhase()                                  # check if you are still assigned
         self.reconsider = census_grew and self.scarcity_k != 0 # if the census grew you must reconsider next round, if k=0 default to standard CBAA
 
+    def getDestination(self, mission_data: MissionData) -> ThreeVector | None:
+        """
+        Returns a ThreeVector of position of target if assigned.
+        If unassigned, returns position to centroid of available targets.
+        If no targets available, returns none.
+        """
+        if self.slot is not None:
+            return mission_data.targets_by_id[
+                self.slot.target_id].target_position.position
+        else:
+            centroid = np.zeros(3)
+            count = 0
+            for role in self.my_roles:
+                for slot in mission_data.slots_by_role.get(role, []):
+                    if slot not in self.winners:
+                        target = mission_data.targets_by_id[slot.target_id]
+                        target_position = np.array(
+                            target.target_position.position)
+                        count += 1
+                        centroid += target_position
 
+            if count == 0:
+                return None
+            return (float(centroid[0] / count), float(centroid[1] / count),
+                    float(centroid[2] / count))
+
+    def step(self, dt, mission_data) -> None:
+        """
+        Updates position and time information of agent
+        """
+        self.mission_time += dt                                   # increment mission time
+        destination = self.getDestination(mission_data)
+        if destination is None:                                   # if all slots are filled
+            if self.loiter_center is None:
+                self.loiter_center = self.state.estimate.position # set the center of the radius to circle around as the current point
+            destination = self.loiter_center
+        else:
+            self.loiter_center = None
+
+        if self.config.platform.value.can_hover:
+            acc_cmd = goToTarget(spec=self.config.platform.value,
+                                 state=self.state,
+                                 target_position=destination)
+        else:
+            acc_cmd = loiterCommand(spec=self.config.platform.value,
+                                    state=self.state,
+                                    target_position=destination,
+                                    direction=1)
+        self.state = advance(spec=self.config.platform.value,
+                             state=self.state,
+                             accel_command=acc_cmd,
+                             dt=dt)
+
+
+#______ HELPER FUNCTIONS ______
 ### comparison between two agents
 ### returns bool comparing score, note version has primacy from the other functions
 def beats(challenger: Bid, incumbent: Bid) -> bool:

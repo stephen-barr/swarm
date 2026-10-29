@@ -18,6 +18,7 @@ from swarm.models import (
     MissionData,
     Payload,
     PlatformClass,
+    PlatformSpec,
     PositionEstimate,
     Target,
     ThreeVector,
@@ -71,11 +72,21 @@ def getDiameter(topology: dict[int, list[int]]) -> int:
 
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)
+FIXED_WING_VI: ThreeVector = (1.0, 1.0, 0.0)
 CHAR_TIME = 60.0        # seconds; shared by every test target
 
 
 def at(x: float, y: float, z: float = 0.0) -> PositionEstimate:
     return PositionEstimate(Frame.GLOBAL, (x, y, z), STILL, COV)
+
+
+def fixed_wing_at(spec: PlatformSpec,
+                  x: float,
+                  y: float,
+                  z: float = 0.0) -> PositionEstimate:
+    """Returns position estimate with velocity equal to v_min headed north east"""
+    init_v = (1 / np.sqrt(2) * spec.v_min, 1 / np.sqrt(2) * spec.v_min, 0.0)
+    return PositionEstimate(Frame.GLOBAL, (x, y, z), init_v, COV)
 
 
 def make_agent(agent_id,
@@ -84,9 +95,14 @@ def make_agent(agent_id,
                y,
                scarcity_k=0.0,
                platform=PlatformClass.GROUP_1_MULTIROTOR):
-    return Agent(AgentConfig(agent_id, platform, frozenset(capabilities)),
-                 at(x, y),
-                 scarcity_k=scarcity_k)
+    if platform.value.can_hover:
+        return Agent(AgentConfig(agent_id, platform, frozenset(capabilities)),
+                     at(x, y),
+                     scarcity_k=scarcity_k)
+    else:
+        return Agent(AgentConfig(agent_id, platform, frozenset(capabilities)),
+                     fixed_wing_at(platform.value, x, y),
+                     scarcity_k=scarcity_k)
 
 
 def make_target(target_id, position, threat, requirements):

@@ -10,7 +10,7 @@ _g = 9.81
 def advance(spec: PlatformSpec, state: AgentState, accel_command: ThreeVector,
             dt: float) -> AgentState:
     x = np.array(state.estimate.position,
-                 dtype=float)               ## Z does not change in current implementations
+                 dtype=float)               ## Z does not change in current implementation
     v = np.array(state.estimate.velocity, dtype=float)
     a = np.array(accel_command, dtype=float)
 
