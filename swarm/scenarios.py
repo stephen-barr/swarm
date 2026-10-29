@@ -6,9 +6,6 @@ from scipy.sparse.csgraph import shortest_path
 from swarm.agent import (
     Agent,
     AgentConfig,
-    buildSlots,
-    groupSlots,
-    indexTargets,
 )
 from swarm.auction import runAuction
 from swarm.comms import Channel
@@ -18,11 +15,15 @@ from swarm.models import (
     Covariance,
     Frame,
     Graph,
+    MissionData,
     Payload,
     PlatformClass,
     PositionEstimate,
     Target,
     ThreeVector,
+    buildSlots,
+    groupSlots,
+    indexTargets,
     role,
 )
 
@@ -117,8 +118,7 @@ def solve(agents: list[Agent],
     """
     ids = [a.config.agent_id for a in agents]
     channel = Channel[Payload](graph(ids))
-    return runAuction(agents, channel, groupSlots(buildSlots(targets)),
-                      indexTargets(targets))
+    return runAuction(agents, channel, MissionData.fromTargets(targets))
 
 
 def random_instance(

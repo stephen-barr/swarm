@@ -4,6 +4,7 @@ Contains all of the types imported by other modules. No logic.
 
 import math
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Generic, NamedTuple, TypeVar
@@ -270,6 +271,40 @@ class AuctionResult:
         None]           # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
     total: float        # sum of winning scores, compared to optimal baseline
     filled: int         # counts slots with a winner
+
+
+def indexTargets(
+    targets: list[Target]
+) -> dict[int, Target]:           # look up table from id to target
+    return {target.target_id: target for target in targets}
+
+
+def groupSlots(
+        slots: list[Slot]
+) -> dict[Role, list[Slot]]:      # group slots by capability
+    slots_by_role: dict[Role, list[Slot]] = defaultdict(list)
+    for s in slots:
+        slots_by_role[s.required].append(s)
+    return slots_by_role
+
+
+def buildSlots(
+    targets: list[Target]
+) -> list[Slot]:                                                      # return the possible slots for an array of targets
+    return [
+        Slot(target.target_id, role_, i) for target in targets
+        for role_, n in target.mostLikely().items() for i in range(n)
+    ]
+
+
+@dataclass(frozen=True)
+class MissionData:
+    targets_by_id: dict[int, Target]
+    slots_by_role: dict[Role, list[Slot]]
+
+    @classmethod
+    def fromTargets(cls, targets: list[Target]):
+        return cls(indexTargets(targets), groupSlots(buildSlots(targets)))
 
 
 MessagesById = dict[int, list[Message]]     # {agent id : [Messages]}

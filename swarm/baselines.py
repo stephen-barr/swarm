@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from swarm.agent import Agent, buildSlots, indexTargets
-from swarm.models import Slot, Target
+from swarm.agent import Agent
+from swarm.models import Slot, Target, buildSlots, indexTargets
 
 
 def createScoreMatrix(
