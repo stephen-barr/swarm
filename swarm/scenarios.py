@@ -22,9 +22,6 @@ from swarm.models import (
     PositionEstimate,
     Target,
     ThreeVector,
-    buildSlots,
-    groupSlots,
-    indexTargets,
     role,
 )
 
@@ -68,7 +65,7 @@ def getDiameter(topology: dict[int, list[int]]) -> int:
     return int(diameter.max())
 
 
-#-------- helper functions ---------
+#______ helper functions ______
 
 COV: Covariance = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 STILL: ThreeVector = (0.0, 0.0, 0.0)

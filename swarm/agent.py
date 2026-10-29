@@ -31,6 +31,7 @@ from swarm.models import (
     Target,
     ThreeVector,
     Winners,
+    raw_score,
 )
 
 
@@ -172,13 +173,12 @@ class Agent:
 
     def makeScore(
         self, target: Target
-    ) -> float:                                                      # build a naive weight based on threat level and time to arrival
-        dist = math.dist(self.state.estimate.position,
-                         target.target_position.position)
-        time_to_arrival = dist / self.config.platform.value.v_cruise # return the estimated time for the agent to arrive at target
-        score = target.threat_level * np.exp(
-            -time_to_arrival / target.threat_char_time
-        )                                                            # use exponential model to lower score as t increases
+    ) -> float:                                       # build a naive weight based on threat level and time to arrival
+        score = raw_score(
+            self.config.platform.value,
+            position=self.state.estimate.position,
+            target=target
+        )                                             # calls raw_score which makes score on time to arrival                                                            # use exponential model to lower score as t increases
         return score
 
     def bid(self, mission_data: MissionData) -> dict[Slot, Bid]:
