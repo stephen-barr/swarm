@@ -27,9 +27,9 @@ Run: python -m experiments.basic_example
 
 from __future__ import annotations
 
-from swarm.agent import Agent, Target
+from swarm.agent import Agent
 from swarm.baselines import solveHungarian
-from swarm.models import Capability, Message, Payload, role
+from swarm.models import Capability, Message, Payload, Target, role
 from swarm.scenarios import at, make_agent, make_target, solve
 
 S = Capability.SURVEILLANCE

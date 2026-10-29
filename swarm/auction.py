@@ -1,10 +1,16 @@
 from swarm.agent import Agent
 from swarm.comms import Channel
-from swarm.models import AuctionResult, Payload, Role, Slot, Target, Winners
+from swarm.models import (
+    AuctionResult,
+    MissionData,
+    Payload,
+    Target,
+    Winners,
+)
 
 
 def runRound(t: int, agents: list[Agent], channel: Channel[Payload],
-             slots_by_role, targets_by_id) -> None:
+             mission_data: MissionData) -> None:
     """
     All agents bid, then all send, then all receive.
     Each phase happens in the same time period for every agent, so message 
@@ -12,7 +18,7 @@ def runRound(t: int, agents: list[Agent], channel: Channel[Payload],
     """
     channel.beginStep(t)
     for a in agents:
-        a.auctionPhase(slots_by_role, targets_by_id)
+        a.auctionPhase(mission_data)
     for a in agents:
         channel.transmitMessage(a.config.agent_id, a.outgoing())
     for a in agents:
@@ -44,8 +50,7 @@ def rawTotal(agents: list[Agent],
 
 def runAuction(agents: list[Agent],
                channel: Channel[Payload],
-               slots_by_role: dict[Role, list[Slot]],
-               targets_by_id: dict[int, Target],
+               mission_data: MissionData,
                max_rounds=500) -> AuctionResult:
     """
     Run synchronous rounds until no agent's winners, census or
@@ -65,11 +70,12 @@ def runAuction(agents: list[Agent],
     for t in range(1, max_rounds + 1):
         before = [(dict(a.winners), dict(a.census), dict(a.latest))
                   for a in agents]
-        runRound(t, agents, channel, slots_by_role, targets_by_id)
+        runRound(t, agents, channel, mission_data)
         if all((a.winners, a.census, a.latest) == b for a, b in zip(
                 agents, before)):                                    # no changes were made this round
             slots_by_id = {a.config.agent_id: a.slot for a in agents}
-            score = rawTotal(agents=agents, targets_by_id=targets_by_id)
+            score = rawTotal(agents=agents,
+                             targets_by_id=mission_data.targets_by_id)
             return AuctionResult(rounds=t,
                                  winners=before[0][0],
                                  assignment=slots_by_id,

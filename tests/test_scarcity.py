@@ -3,8 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from swarm.agent import buildSlots, groupSlots, indexTargets
-from swarm.models import Capability, Message, Payload, role
+from swarm.models import Capability, Message, MissionData, Payload, role
 from swarm.scenarios import at, make_agent, make_target, solve
 
 S = Capability.SURVEILLANCE
@@ -33,11 +32,6 @@ def agent_with_census(my_caps, others_caps, k):
     return a
 
 
-def setup(targets):
-    """The three lookups the auction passes to bid() / auctionPhase()."""
-    return groupSlots(buildSlots(targets)), indexTargets(targets)
-
-
 # ---- test 1: the weight value ----
 
 
@@ -51,9 +45,9 @@ def test_weight_is_exp_minus_k_n_over_N(others_caps, n):
     k = 2.0
     a = agent_with_census([S], others_caps, k)
     target = make_target(0, at(100, 0), 0.5, {role(S): {1: 1.0}})
-    slots_by_role, targets_by_id = setup([target])
+    mission_data = MissionData.fromTargets([target])
 
-    bids = a.bid(slots_by_role, targets_by_id)
+    bids = a.bid(mission_data)
     (_, b), = bids.items()        # exactly one slot
     raw = a.makeScore(target)
     N = len(a.census)
@@ -83,9 +77,9 @@ def test_versatile_drone_takes_scarce_slot_when_weighted(k, expected_target):
                                               1: 1.0
                                           }}),        # scarce role, same distance
     ]
-    slots_by_role, targets_by_id = setup(targets)
+    mission_data = MissionData.fromTargets(targets)
 
-    a.auctionPhase(slots_by_role, targets_by_id)
+    a.auctionPhase(mission_data)
 
     assert a.slot is not None
     assert a.slot.target_id == expected_target
@@ -141,18 +135,22 @@ def test_weight_accounts_for_demand():
                                              3: 1.0
                                          }}),         # 3 slots
     ]
-    slots_by_role, targets_by_id = setup(targets)
-    bids = a.bid(slots_by_role, targets_by_id)
+    mission_data = MissionData.fromTargets(targets)
+    bids = a.bid(mission_data)
 
     def weight(r):
         """The scarcity weight on role r's first slot: weighted bid / raw score."""
-        slot = slots_by_role[r][0]
-        return bids[slot].score / a.makeScore(targets_by_id[slot.target_id])
+        slot = mission_data.slots_by_role[r][0]
+        return bids[slot].score / a.makeScore(
+            mission_data.targets_by_id[slot.target_id])
 
     n = {r: a.capability_count[r] for r in (role(S), role(M))} # supply
-    d = {r: len(slots_by_role[r]) for r in (role(S), role(M))} # demand
+    d = {
+        r: len(mission_data.slots_by_role[r])
+        for r in (role(S), role(M))
+    }                                                          # demand
     N = len(a.census)
-    D = sum(len(slots) for slots in slots_by_role.values())
+    D = sum(len(slots) for slots in mission_data.slots_by_role.values())
 
     assert weight(role(S)) == pytest.approx(
         np.exp(-k * (n[role(S)] / d[role(S)]) / (N / D)))

@@ -1,8 +1,8 @@
 import csv
 from typing import NamedTuple
 
-from swarm.agent import buildSlots
 from swarm.baselines import greedyBaseline, solveHungarian
+from swarm.models import buildSlots
 from swarm.scenarios import (
     complete_graph,
     getDiameter,

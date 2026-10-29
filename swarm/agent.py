@@ -9,7 +9,6 @@ Note that targets are assumed to be known by all and thus not distributed.
 from __future__ import annotations
 
 import math
-from collections import defaultdict
 from itertools import combinations
 
 import numpy as np
@@ -21,6 +20,7 @@ from swarm.models import (
     Frame,
     Latest,
     Message,
+    MissionData,
     Payload,
     PositionEstimate,
     Role,
@@ -174,16 +174,16 @@ class Agent:
         )                                                         # use exponential model to lower score as t increases
         return score
 
-    def bid(self, slots_by_role: dict[Role, list[Slot]],
-            targets_by_id: dict[int, Target]) -> dict[Slot, Bid]:
+    def bid(self, mission_data: MissionData) -> dict[Slot, Bid]:
 
         # score all of the targets by id
         scores = {
             t_id: self.makeScore(target)
-            for t_id, target in targets_by_id.items()
+            for t_id, target in mission_data.targets_by_id.items()
         }
         # total number of slots for the auction
-        total_slots = sum(len(slots) for slots in slots_by_role.values())
+        total_slots = sum(
+            len(slots) for slots in mission_data.slots_by_role.values())
 
         # number of drones agent knows of / number of slots
         drones_slot_ratio = len(self.census) / total_slots
@@ -193,9 +193,11 @@ class Agent:
         role_to_weight = {
             role:
             math.exp(-self.scarcity_k *
-                     (self.capability_count[role] / len(slots_by_role[role])) /
+                     (self.capability_count[role] /
+                      len(mission_data.slots_by_role[role])) /
                      drones_slot_ratio)
-            for role in slots_by_role if role <= self.config.capabilities
+            for role in mission_data.slots_by_role
+            if role <= self.config.capabilities
         }
 
         ### one weighted bid per slot of an eligible role
@@ -205,17 +207,16 @@ class Agent:
                 agent_id=self.config.agent_id,
                 version=self.latest[self.config.agent_id])
             for role, w in role_to_weight.items()
-            for s in slots_by_role[role]
+            for s in mission_data.slots_by_role[role]
         }
 
         self.last_bids = bids     # now used in movement
         return bids
 
-    def auctionPhase(self, slots_by_role: dict[Role, list[Slot]],
-                     targets_by_id: dict[int, Target]) -> None:
+    def auctionPhase(self, mission_data: MissionData) -> None:
         if self.slot is not None and not self.reconsider:
             return                                                      # already assigned and not reconsidering
-        bids = self.bid(slots_by_role, targets_by_id)
+        bids = self.bid(mission_data)
         contenders: dict[Slot, Bid] = {
             s: b
             for s, b in bids.items() if s not in self.winners or beats(
@@ -283,27 +284,3 @@ def beats(challenger: Bid, incumbent: Bid) -> bool:
     and ensures convergence).
     """
     return challenger > incumbent
-
-
-def buildSlots(
-    targets: list[Target]
-) -> list[Slot]:                                                      # return the possible slots for an array of targets
-    return [
-        Slot(target.target_id, role_, i) for target in targets
-        for role_, n in target.mostLikely().items() for i in range(n)
-    ]
-
-
-def indexTargets(
-    targets: list[Target]
-) -> dict[int, Target]:           # look up table from id to target
-    return {target.target_id: target for target in targets}
-
-
-def groupSlots(
-        slots: list[Slot]
-) -> dict[Role, list[Slot]]:      # group slots by capability
-    slots_by_role: dict[Role, list[Slot]] = defaultdict(list)
-    for s in slots:
-        slots_by_role[s.required].append(s)
-    return slots_by_role

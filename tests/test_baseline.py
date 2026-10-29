@@ -3,17 +3,15 @@ import random
 
 import pytest
 
-from swarm.agent import (
-    buildSlots,
-    indexTargets,
-)
 from swarm.auction import weightedTotal
 from swarm.baselines import solveHungarian
 from swarm.models import (
     Bid,
     Capability,
     Covariance,
+    MissionData,
     ThreeVector,
+    buildSlots,
     role,
 )
 from swarm.scenarios import at, make_agent, make_target
@@ -36,8 +34,9 @@ def bruteForce(agents, targets):
     Each agent takes one eligible slot or none; no slot is used twice.
     Score-first maximises total; coverage-first maximises filled, then total.
     """
+    mission_data = MissionData.fromTargets(targets)
     slots = buildSlots(targets)
-    targets_by_id = indexTargets(targets)
+    targets_by_id = mission_data.targets_by_id
     options = [[None] + [j for j, s in enumerate(slots) if eligible(a, s)]
                for a in agents]
     best = (0, 0.0)
