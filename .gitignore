@@ -18,3 +18,4 @@ results/*
 *.egg-info/
 .coverage
 !experiments/docs/figures/*.png
+!experiments/docs/figures/*.gif
