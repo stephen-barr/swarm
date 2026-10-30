@@ -262,18 +262,27 @@ class Target:
         return most_likely
 
 
+class Snapshot(NamedTuple):
+    time: float
+    slot: Slot | None
+    state: AgentState
+
+
 @dataclass(frozen=True)
 class AuctionResult:
-    dynamics: bool                # were dynamics considered
-    converged: bool               # did the auction converge
-    rounds: int                   # number of rounds until auction converges
-    winners: Winners              # the agreed table
+    dynamics: bool                          # were dynamics considered
+    converged: bool                         # did the auction converge
+    rounds: int                             # number of rounds until auction converges
+    winners: Winners                        # the agreed table
     assignment: dict[
         int, Slot |
-        None]                     # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
-    total: float                  # sum of winning scores, compared to optimal baseline
-    filled: int                   # counts slots with a winner
-    completion_time: float = 0    # total time for mission, set at zero so static examples cooperate.
+        None]                               # agent_id -> slot, assignment[i] -> None implies agent i is unassigned
+    total: float                            # sum of winning scores, compared to optimal baseline
+    filled: int                             # counts slots with a winner
+    completion_time: float = 0              # total time for mission, set at zero so static examples cooperate.
+    state_history: dict[
+        int,
+        list[Snapshot]] | None = None       # history of all agent states over auction
 
 
 def indexTargets(

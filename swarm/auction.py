@@ -6,6 +6,7 @@ from swarm.models import (
     AuctionResult,
     MissionData,
     Payload,
+    Snapshot,
     ThreeVector,
     Winners,
     raw_score,
@@ -60,11 +61,10 @@ def runAuction(agents: list[Agent],
     versions change (checked by an outside observer, not the agents).
 
     Args:
-        agents: Fresh agents; mutated in place.
-        channel: Delivers packets between neighbours; must be connected.
-        slots_by_role: Slots grouped by required role.
-        targets_by_id: Lookup from target_id to Target.
-        max_rounds: Safety cap.
+        agents: List of agents.
+        channel: Delivers packets between neighbours.
+        mission_data: Information about targets and slots that every drone has.
+        max_rounds: How long you let it go for if it does not converge.
 
     Returns: AuctionResult (winners, assignment, total, filled, rounds).
     Raises: RuntimeError if still changing after max_rounds.
@@ -104,34 +104,39 @@ def runMission(agents: list[Agent],
     AND every agent has reached target within tolerance (checked by an outside observer, not the agents).
 
     Args:
-        agents: Fresh agents; mutated in place.
-        channel: Delivers packets between neighbours; must be connected.
+        agents: List of agents.
+        channel: Delivers packets between neighbours.
         mission_data: information about targets/slots, call 
         [MissionData].fromTargets(list[Target]) to create dataclass.
         dt: control loop period for dynamics
         radio_period: control loop period for RF transmissions (rounds)
         max_time: maximum amount of time you let the auction go.
-    Returns: AuctionResult (converged, winners, assignment, total, filled, rounds).
-    In any case, convergence or max_time reached discernable from converged bool.
+    Returns: AuctionResult (converged, winners, assignment, total, filled, rounds, snapshots).
+    In any case, convergence or max_time reached, discernable from converged bool.
     """
     ticks_per_round = round(radio_period /
-                            dt)                                          # how many dt for one radio transmission
+                            dt)                                           # how many dt for one radio transmission
     rnd = 0
-    round_convergence = 0                                                # increments until the auction algorithm stops
+    round_convergence = 0                                                 # increments until the auction algorithm stops
     start_positions = {
         a.config.agent_id: a.state.estimate.position
         for a in agents
-    }                                                                    # start positions needed for accurate scoring with dynamics
+    }                                                                     # start positions needed for accurate scoring with dynamics
+    state_slot_history: dict[int, list[Snapshot]] = {
+        a.config.agent_id: [Snapshot(time=0.0, slot=None, state=a.state)]
+        for a in agents
+    }
+                                                                          # record the first states, slots, time to the history
     for tick in range(round(max_time / dt)):
-        if tick % ticks_per_round == 0:                                  # if it is time for radio transmission
-            rnd += 1                                                     # how many rounds
+        if tick % ticks_per_round == 0:                                   # if it is time for radio transmission
+            rnd += 1                                                      # how many rounds
             before = [(dict(a.winners), dict(a.census), dict(a.latest))
                       for a in agents]
             runRound(rnd, agents, channel, mission_data)
             no_changes_to_payloads: bool = all(
                 (a.winners, a.census, a.latest) == b
                 for a, b in zip(agents, before)
-            )                                                            # were changes made to census, winners, or latest
+            )                                                             # were changes made to census, winners, or latest
             agents_at_location = True
             for a in agents:
                 if a.slot is not None:
@@ -141,16 +146,16 @@ def runMission(agents: list[Agent],
                     if a.config.platform.value.can_hover:
                         if np.linalg.norm(
                                 agent_position - current_slot_position
-                        ) > 1:                                           # check if a multirotor is within a meter of target
+                        ) > 1:                                            # check if a multirotor is within a meter of target
                             agents_at_location = False
                     else:
                         if np.linalg.norm(
                                 agent_position - current_slot_position
-                        ) > 1.2 * a.config.platform.value.loiter_radius: # check if a fixed wing is within 1.2 (tolerance) of loiter radius to target
+                        ) > 1.2 * a.config.platform.value.loiter_radius:  # check if a fixed wing is within 1.2 (tolerance) of loiter radius to target
                             agents_at_location = False
             if not no_changes_to_payloads:
-                round_convergence = rnd                                  # take down how many rounds it took for auction to converge
-            if agents_at_location and no_changes_to_payloads:            # no changes made, return AuctionResult
+                round_convergence = rnd                                   # take down how many rounds it took for auction to converge
+            if agents_at_location and no_changes_to_payloads:             # no changes made, return AuctionResult
                 slots_by_id = {a.config.agent_id: a.slot for a in agents}
                 score = rawTotal(agents=agents,
                                  mission_data=mission_data,
@@ -162,11 +167,20 @@ def runMission(agents: list[Agent],
                                      assignment=slots_by_id,
                                      total=score[0],
                                      filled=score[1],
-                                     completion_time=tick * dt)
+                                     completion_time=(tick + 1) * dt,
+                                     state_history=state_slot_history)
 
         ### advance all the agents
         for a in agents:
-            a.step(dt, mission_data=mission_data)
+            if a.slot is not None:
+                slot = a.slot
+            else:
+                slot = None
+
+            a.step(dt, mission_data=mission_data)         # take a step
+            state_slot_history[a.config.agent_id].append(
+                Snapshot(time=(tick + 1) * dt, slot=slot,
+                         state=a.state))                  # append the snapshot to the history
 
     slots_by_id = {a.config.agent_id: a.slot for a in agents}
     score = rawTotal(agents, mission_data, positions=start_positions)
@@ -177,4 +191,5 @@ def runMission(agents: list[Agent],
                          assignment=slots_by_id,
                          total=score[0],
                          filled=score[1],
-                         completion_time=max_time)
+                         completion_time=max_time,
+                         state_history=state_slot_history)
