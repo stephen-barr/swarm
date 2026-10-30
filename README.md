@@ -9,6 +9,8 @@ Such a question is of broad interest to the field of autonomous systems. Conside
 
 *Medical triage via unmanned vehicles requires real-time coalition assignments with uncertain priority and capability requirements. Such systems are often needed in hostile environments where RF communication is jammed, leading to packet loss. How can a swarm accurately allocate capabilities to casualties?*
 
+<p align="center"><img src="experiments/docs/figures/mission.gif" width="650" alt="Mission replay"></p>
+
 ## Benchmark Results
 800 random instances across four swarm sizes, each solved on complete, ring and line topologies and compared against the optimal (Hungarian) assignment.
 
