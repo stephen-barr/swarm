@@ -1,9 +1,13 @@
+import numpy as np
 import pytest
 
-from swarm.auction import weightedTotal
+from swarm.auction import runMission, weightedTotal
 from swarm.baselines import greedyBaseline, solveHungarian
+from swarm.comms import Channel
 from swarm.models import (
     Capability,
+    MissionData,
+    Payload,
     role,
 )
 from swarm.scenarios import (
@@ -230,3 +234,43 @@ def test_tables_consistent_with_scarcity(seed, k, graph):
         assert holders[
             bid.
             agent_id] == slot, "table names a winner that does not hold the slot"
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("seed", range(5))
+def test_run_mission(seed, graph):
+    agents, targets = random_instance(seed,
+                                      n_agents=6,
+                                      n_targets=3,
+                                      max_role_size=2,
+                                      scarcity_k=0.1)
+    hung_total, _ = solveHungarian(
+        agents,
+        targets=targets,
+    )
+    channel = Channel[Payload](graph([a.config.agent_id for a in agents]))
+    mission_data = MissionData.fromTargets(targets)
+    auction_result = runMission(agents, channel, mission_data)
+    consistent = True
+    arrived = True
+    for a in agents:
+        if a.winners != agents[0].winners:
+            consistent = False
+        if a.slot is not None:
+            slot_position = mission_data.slotPosition(a.slot)
+            if a.config.platform.value.can_hover:
+                if np.linalg.norm(
+                        np.array(a.state.estimate.position) -
+                        np.array(slot_position)) > 1:         # within a meter
+                    arrived = False
+            else:
+                if np.linalg.norm(
+                        np.array(a.state.estimate.position) -
+                        np.array(slot_position)
+                ) > 1.2 * a.config.platform.value.loiter_radius:
+                    arrived = False
+
+    assert (consistent & arrived
+            ) == auction_result.converged             # check that converged actually works
+    assert auction_result.converged                   # small instances actually converge before max time
+    assert auction_result.total <= hung_total + 1e-9  # still bounded by Hungarian
