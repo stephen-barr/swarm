@@ -17,7 +17,7 @@ To reproduce these tables: `python -m experiments.benchmark`, then print `python
 | 48 | 24 | 0 | 95.4% | 91.5% | 85.8% | 0% | 95.7% | 43% |
 
 ## Convergence
-Convergence is bounded by $\text{slots }\cdot \text{diameter}$ in the theoretical worst case.
+Convergence is bounded by $\text{slots} \times \text{diameter}$ in the theoretical worst case.
 
 | Drones | Targets | Network | Diameter | Median rounds | Max rounds | Median rounds / diameter | Worst rounds / bound | Median messages | Same as complete |
 |---|---|---|---|---|---|---|---|---|---|
