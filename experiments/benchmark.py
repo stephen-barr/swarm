@@ -41,9 +41,9 @@ def runInstance(size: tuple, seed, graphs: dict):
                            n_targets=size[1],
                            max_role_size=2)
     hungarian_result = solveHungarian(agents=a,
-                                      targets=t)      # run the optimal allocation
+                                      targets=t)            # run the optimal allocation
     greedy_result = greedyBaseline(agents=a,
-                                   targets=t)         # run the greedy allocation
+                                   targets=t)               # run the greedy allocation
     rows = []
     complete_winners = None
     for name, graph in graphs.items():
@@ -53,9 +53,13 @@ def runInstance(size: tuple, seed, graphs: dict):
                                max_role_size=2)
         topology = graph([agent.config.agent_id for agent in a])
         auction_result = solve(agents=a, targets=t, graph=graph)
+        holders = {
+            slot: bid.agent_id
+            for slot, bid in auction_result.winners.items()
+        }                                                   # do not consider the version number in comparison.
 
         if name == "complete":
-            complete_winners = auction_result.winners # list of winners from the complete graph
+            complete_winners = holders      # list of winners from the complete graph
 
         rows.append(
             Row(
@@ -74,7 +78,7 @@ def runInstance(size: tuple, seed, graphs: dict):
                 hungarian_filled=hungarian_result[1],
                 greedy_total=greedy_result[0],
                 greedy_filled=greedy_result[1],
-                matches_complete=auction_result.winners ==
+                matches_complete=holders ==
                 complete_winners,                                       # do the winners match the complete graph
             ))
     return rows
