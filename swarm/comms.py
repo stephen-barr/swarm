@@ -1,4 +1,5 @@
 import copy
+import random
 from typing import Generic
 
 from swarm.models import Message, P
@@ -15,19 +16,24 @@ class Channel(Generic[P]):
     catching an agent that skipped its receive phase.
     """
 
-    def __init__(self, edge_list: EdgeList) -> None:
+    def __init__(self, edge_list: EdgeList, message_delay: int = 0) -> None:
         self.edge_list = edge_list
         self.time_step: int = 0
-        self.message_delay: int = 0                   # set the message delay to zero as default
+        self.message_delay: int = message_delay
         self.mailbox: dict[int, list[Message[P]]] = {
             agent_id: []
             for agent_id in edge_list
         }
-        self.transmissions: int = 0                   # number of transmissions
+        self.transmissions: int = 0         # number of transmissions
 
     def beginStep(self, t) -> None:
         assert t == self.time_step + 1, f"expected step {self.time_step + 1}, got {t}"
         self.time_step = t
+
+    def messageDelay(
+            self
+    ) -> int:           # return the message delay, subclass modifies only this
+        return self.message_delay
 
     def transmitMessage(
         self,
@@ -43,7 +49,7 @@ class Channel(Generic[P]):
                 receiver_id=neighbor_id,
                 payload=snapshot,
                 send_step=self.time_step,
-                message_delay=self.message_delay,
+                message_delay=self.messageDelay(),
             )
             self.mailbox[neighbor_id].append(message)
 
@@ -68,3 +74,16 @@ class Channel(Generic[P]):
             if any(m.deliveryStep <= self.time_step for m in box)
         }
         assert not leftover_messages, f"undelivered at time {self.time_step} : {leftover_messages}"
+
+
+class RandomDelayChannel(Channel[P]):
+    """Channel with uniformly random delay between 0 and message_delay per message."""
+
+    def __init__(self, edge_list: EdgeList, message_delay: int,
+                 rng_seed: int) -> None:
+        super().__init__(edge_list, message_delay)
+        self.rng = random.Random(
+            rng_seed)                       # make a random seed for reproducibility
+
+    def messageDelay(self) -> int:
+        return self.rng.randint(0, self.message_delay)

@@ -1,11 +1,16 @@
+from collections import defaultdict
+
 import pytest
 
-from swarm.comms import Channel
+from swarm.comms import Channel, RandomDelayChannel
 from swarm.scenarios import complete_edges, edges_to_topology, line_edges, ring_edges
 
 LINE = (edges_to_topology(line_edges(5)))
 COMPLETE = (edges_to_topology(complete_edges(5)))
 RING = (edges_to_topology(ring_edges(5)))
+
+SEEDS = (10, 14, 21)
+DELAY = (0, 4, 8, 16)
 
 
 def test_broadcast_reaches_only_neighbours():
@@ -94,8 +99,7 @@ def test_undelivered_messages_are_caught():
 
 
 def test_delay_withholds_then_releases():
-    ch = Channel(LINE)
-    ch.message_delay = 2
+    ch = Channel(LINE, 2)
     ch.beginStep(1)
     ch.transmitMessage(0, {"from": 0})
     assert ch.deliverMessage(1) == []
@@ -133,3 +137,38 @@ def test_information_crosses_the_line_in_two_hops():
     ch.endStep()
 
     assert heard[2] == {"origin": 0}        # arrived on the second hop
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+@pytest.mark.parametrize("delay", DELAY)
+def test_random_delay_stays_between_zero_and_max_delay(delay, seed):
+    ch = RandomDelayChannel(RING, message_delay=delay, rng_seed=seed)
+    log = []
+    N = 30
+    for t in range(1, N + ch.message_delay +
+                   1):                                # length of full communication plus delay
+        ch.beginStep(t)
+        if t <= N:
+            for i in ch.mailbox:
+                ch.transmitMessage(i, {"from": i, "sent": t})
+        for i in ch.mailbox:
+            for m in ch.deliverMessage(i):
+                log.append((m.send_id, m.receiver_id, m.send_step, t))
+        ch.endStep()
+    assert all(0 <= l[3] - l[2] <= delay for l in log)
+    messages_per_round = sum(len(v) for v in RING.values())
+    assert len(log) == N * messages_per_round         # assert no messages were dropped
+
+    by_sender_receiver = defaultdict(list)
+    for sender, receiver, sent, delivered in log:
+        by_sender_receiver[(sender, receiver)].append(
+            (sent, delivered))                         # (sender, reciever) : (sent, delivered)
+
+    messages_out_of_order = False
+    for delay_info in by_sender_receiver.values():
+        delay_info.sort(key=lambda e: (e[1], e[0]))
+        sends = [sent for sent, _ in delay_info]
+        if any(a > b for a, b in zip(sends, sends[1:])):
+            messages_out_of_order = True
+    if delay > 0:
+        assert messages_out_of_order
