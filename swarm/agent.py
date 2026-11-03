@@ -106,20 +106,26 @@ class Agent:
         Rejects bids older than last known message.
         """
         changed = False
-        for m in messages:                            # messages for agent is sorted by agent and time
+        for m in messages:                                                             # messages for agent is sorted by agent and time
             for slot, bid in m.payload.winners.items():
                 if beats(
                         bid,
                         self.winners.get(
                             slot, LOSES_TO_ALL
-                        )                             # a slot that is not yet assigned is given LOSES_TO_ALL
+                        )                                                              # a slot that is not yet assigned is given LOSES_TO_ALL
                 ) and bid.version >= self.latest.get(
                         bid.agent_id, 0
-                ):                                    # check that the new message is at least as recent as the last message                                    # update only the slots that have changed or are not yet present
+                ):                                                                     # check that the new message is at least as recent as the last message                                    # update only the slots that have changed or are not yet present
                     if bid.version > self.latest.get(bid.agent_id, 0):
-                        self.latest_to_share = True   # flag that latest needs to be shared
+                        self.latest_to_share = True                                    # flag that latest needs to be shared
+                        for s, b in list(self.winners.items()
+                                         ):                                            # loop over the bids in winners
+                            if b.agent_id == bid.agent_id and b.version < bid.version: # if the bid is stale (older version number)
+                                del self.winners[s]                                    # delete it
+
                     self.winners[slot] = bid
                     self.latest[bid.agent_id] = bid.version
+
                     changed = True
         return changed
 
