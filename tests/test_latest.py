@@ -125,3 +125,15 @@ def test_lost_bid_echoed_back_is_rejected():
 
     a.receieve([msg(2, {S: Bid(0.5, 0, 0)})])         # stale echo
     assert S not in a.winners
+
+
+def test_update_winners_removes_stale_winners():
+    a = fresh_agent()
+    a.winners[S] = Bid(0.8, 3, 1)           # make a bid winners table with
+    a.latest[3] = 1
+    a.updateWinners([
+        msg(1, {T: Bid(0.5, 3, 2)})
+    ])                                      # message arrives new bid for agent 3 but no new latest table (delayed)
+    assert S not in a.winners               # the old bid was removed
+    assert a.winners[T] == Bid(0.5, 3, 2)   # new bid was stored
+    assert a.latest[3] == 2                 # assert the latest version heard from 3 is two.
