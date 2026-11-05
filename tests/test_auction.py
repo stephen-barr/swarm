@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from swarm.auction import runMission, weightedTotal
+from swarm.auction import runAuction, runMission, weightedTotal
 from swarm.baselines import greedyBaseline, solveHungarian
 from swarm.comms import Channel
 from swarm.models import (
@@ -274,3 +274,45 @@ def test_run_mission(seed, graph):
             ) == auction_result.converged             # check that converged actually works
     assert auction_result.converged                   # small instances actually converge before max time
     assert auction_result.total <= hung_total + 1e-9  # still bounded by Hungarian
+
+
+@pytest.mark.parametrize("graph", GRAPHS)
+@pytest.mark.parametrize("seed", range(30))
+@pytest.mark.parametrize("k", {0.0, 0.1})
+def test_static_auction_w_delay(seed, graph, k):
+    agents, targets = random_instance(seed,
+                                      n_agents=6,
+                                      n_targets=3,
+                                      max_role_size=2,
+                                      scarcity_k=k)
+    channel = Channel[Payload](edge_list=graph(
+        [a.config.agent_id for a in agents]),
+                               message_delay=3)
+    hungarian_result = solveHungarian(agents, targets)
+    auction_result = runAuction(agents,
+                                channel,
+                                mission_data=MissionData.fromTargets(targets))
+    assert auction_result.total <= hungarian_result[0] + 1e-6
+
+    winners_tables: list[dict] = [{
+        s: b.agent_id
+        for s, b in a.winners.items()
+    } for a in agents]
+    reference = winners_tables[0]
+    assert all(winners == reference
+               for winners in winners_tables)         # all tables agree
+
+    self_reported_slots = {
+        a.config.agent_id: a.slot
+        for a in agents if a.slot is not None
+    }
+    assert all(
+        self_reported_slots.get(id) == s for s, id in reference.items()
+    )                                                                   # assert all of the agents belief about there slot matches winners
+    assert all(reference.get(s) == id for id, s in self_reported_slots.items())
+
+    assert len(set(self_reported_slots.values())) == len(
+        self_reported_slots
+    )                                                     # assert that no slot is held by two different agents, set collapses duplicates
+
+    assert len(set(reference.values())) == len(reference)
