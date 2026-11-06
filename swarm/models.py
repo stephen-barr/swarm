@@ -310,11 +310,15 @@ def buildSlots(
 
 
 def raw_score(
-    spec: PlatformSpec, position: ThreeVector, target: Target
-) -> float:                                                   # naive scoring based on time to arrival, more info in README
+    spec: PlatformSpec,
+    position: ThreeVector,
+    target: Target,
+    mission_time: float = 0.0
+) -> float:                                 # naive scoring based on time to arrival, more info in README
     dist = math.dist(position, target.target_position.position)
+    t_arrival = dist / spec.v_cruise
     return target.threat_level * math.exp(
-        -(dist / spec.v_cruise) / target.threat_char_time)
+        -(t_arrival + mission_time) / target.threat_char_time)
 
 
 @dataclass(frozen=True)

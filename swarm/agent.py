@@ -183,7 +183,8 @@ class Agent:
         score = raw_score(
             self.config.platform.value,
             position=self.state.estimate.position,
-            target=target
+            target=target,
+            mission_time=self.mission_time
         )                                             # calls raw_score which makes score on time to arrival                                                            # use exponential model to lower score as t increases
         return score
 
