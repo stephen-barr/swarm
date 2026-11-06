@@ -95,7 +95,7 @@ def test_correction_that_lost_elsewhere_still_kills_stale_bid():
     a = fresh_agent()
     a.winners[S] = Bid(0.8, 3, 1)
     a.latest[3] = 1
-    a.receieve([msg(1, {S: Bid(0.7, 5, 1)}, latest={3: 2, 5: 1})])
+    a.receive([msg(1, {S: Bid(0.7, 5, 1)}, latest={3: 2, 5: 1})])
     assert a.winners[S] == Bid(0.7, 5, 1)
 
 
@@ -105,7 +105,7 @@ def test_stale_bid_echoed_back_is_rejected():
     a = fresh_agent()
     a.winners[S] = Bid(0.7, 5, 1)
     a.latest.update({3: 2, 5: 1})
-    a.receieve([msg(1, {S: Bid(0.8, 3, 1)})])
+    a.receive([msg(1, {S: Bid(0.8, 3, 1)})])
     assert a.winners[S] == Bid(0.7, 5, 1)
 
 
@@ -117,13 +117,13 @@ def test_lost_bid_echoed_back_is_rejected():
     a.winners[S] = Bid(0.5, 0, 0)
     a.slot = S
 
-    a.receieve([msg(1, {S: Bid(0.9, 5, 1)}, latest={5: 1})]) # outbid
+    a.receive([msg(1, {S: Bid(0.9, 5, 1)}, latest={5: 1})]) # outbid
     assert a.slot is None
 
-    a.receieve([msg(1, {}, latest={5: 2})])           # drone 5 moves on
+    a.receive([msg(1, {}, latest={5: 2})])  # drone 5 moves on
     assert S not in a.winners
 
-    a.receieve([msg(2, {S: Bid(0.5, 0, 0)})])         # stale echo
+    a.receive([msg(2, {S: Bid(0.5, 0, 0)})])          # stale echo
     assert S not in a.winners
 
 

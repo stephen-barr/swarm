@@ -316,3 +316,14 @@ def test_static_auction_w_delay(seed, graph, k):
     )                                                     # assert that no slot is held by two different agents, set collapses duplicates
 
     assert len(set(reference.values())) == len(reference)
+
+
+def test_agent_with_higher_mission_time_loses():
+    agent_newer = make_agent(0, {A, B}, 0.0, 0.0)
+    agent_older = make_agent(1, {A, B}, 0.0, 0.0)
+    target = make_target(0, at(100, 100), 0.5, {role(A): {1: 1.0}})
+
+    agent_newer.mission_time = 1.0
+    agent_older.mission_time = 5.0
+
+    assert agent_newer.makeScore(target) > agent_older.makeScore(target)

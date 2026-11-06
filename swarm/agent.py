@@ -183,7 +183,8 @@ class Agent:
         score = raw_score(
             self.config.platform.value,
             position=self.state.estimate.position,
-            target=target
+            target=target,
+            mission_time=self.mission_time
         )                                             # calls raw_score which makes score on time to arrival                                                            # use exponential model to lower score as t increases
         return score
 
@@ -279,7 +280,7 @@ class Agent:
             self.latest_to_share = True
             return
 
-    def receieve(self, messages: list[Message[Payload]]):
+    def receive(self, messages: list[Message[Payload]]):
         census_grew = self.updateCensus(messages)
         self.mergeLatest(messages)
         self.updateWinners(messages)                           # update winners from message list
