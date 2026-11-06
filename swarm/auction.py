@@ -26,7 +26,7 @@ def runRound(t: int, agents: list[Agent], channel: Channel[Payload],
     for a in agents:
         channel.transmitMessage(a.config.agent_id, a.outgoing())
     for a in agents:
-        a.receieve(channel.deliverMessage(a.config.agent_id))
+        a.receive(channel.deliverMessage(a.config.agent_id))
     channel.endStep()
 
 

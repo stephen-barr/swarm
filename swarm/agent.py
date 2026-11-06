@@ -279,7 +279,7 @@ class Agent:
             self.latest_to_share = True
             return
 
-    def receieve(self, messages: list[Message[Payload]]):
+    def receive(self, messages: list[Message[Payload]]):
         census_grew = self.updateCensus(messages)
         self.mergeLatest(messages)
         self.updateWinners(messages)                           # update winners from message list

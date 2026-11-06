@@ -168,7 +168,8 @@ def test_random_delay_stays_between_zero_and_max_delay(delay, seed):
     for delay_info in by_sender_receiver.values():
         delay_info.sort(key=lambda e: (e[1], e[0]))
         sends = [sent for sent, _ in delay_info]
-        if any(a > b for a, b in zip(sends, sends[1:])):
+        if any(a > b for a, b in zip(
+                sends, sends[1:])):         # assert there are messages out of order
             messages_out_of_order = True
     if delay > 0:
         assert messages_out_of_order
