@@ -1,9 +1,9 @@
-<!-- OUTLINE. Delete before committing. -->
-
 # Consensus-Based Decentralized Auctions for Heterogeneous Drone Swarms
 [![tests](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml/badge.svg)](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml)
 
-![Mission replay](experiments/docs/figures/mission.gif)
+<p align="center">
+  <img width="610" src="experiments/docs/figures/mission.gif" alt="Mission replay">
+</p>
 
 This is a from-scratch Python implementation of decentralized task allocation for a heterogeneous drone swarm. The fundamental problem it aims to solve is as follows:
 
@@ -31,6 +31,11 @@ Notably, we introduce scarcity weighting which prioritizes slots that are harder
 
 
 ### Scoring
+
+<p align="center">
+<img width="500" alt="discounted_value" src="https://github.com/user-attachments/assets/c38e5a39-c8dc-48a5-a211-bc649c20e1c6" />
+</p>
+
 Agents utilize a time-to-arrival scoring methodology. Where the time to arrival is calculated as $t = t_m + \frac{d}{v_{\text{cruise}}}$, where $t_m$ is the current time since the beginning of the mission, $d$, the current euclidean distance from the agent to the target, and $v_{\text{cruise}}$, the cruise velocity of the agent (as specified by the class).
 
 Additionally, we weight a target's importance using two factors, a linear weight $V$ representing how much the task is worth, and an exponential term $\tau$ representing the scale of time decay. Without the linear component, every score would be worth the same at equal distance and time zero. Without the time decay term, the model would lack a sense of *urgency* between two generic targets. 
@@ -38,19 +43,16 @@ Additionally, we weight a target's importance using two factors, a linear weight
 Thus, we have a general score model:
 $$\text{score} = V e^{-t/\tau}$$
 
-Notably, the value of a target halves every $0.69 \tau$. Some generic scores are given as a function of time to arrival below:
-
-<p align="center">
-<img width="610" alt="discounted_value" src="https://github.com/user-attachments/assets/c38e5a39-c8dc-48a5-a211-bc649c20e1c6" />
-</p>
+Notably, the value of a target halves every $0.69 \tau$. Some generic scores are given as a function of time to arrival above, illustrating the use.
 
 
 
 ### Scarcity-Aware Bidding
-<figure>
-<img src=experiments/docs/figures/seed47_compare.gif alt="Scarcity Weighting">
-<figcaption> Scarcity weighting allows two extra slots to be filled, increasing score from 88% of optimal to 96% of optimal, at a cost of three seconds for further agent travel. </figcaption>
-</figure>
+<p align="center">
+  <img width="900" src="experiments/docs/figures/seed47_compare.gif" alt="Scarcity weighting">
+  <br>
+  <em>Scarcity weighting fills two extra slots, raising the score from 88% to 96% of optimal, at the cost of three seconds of extra travel.</em>
+</p>
 
 In heterogenous systems naive scoring does not account for the scarcity of a capability in a swarm relative to the demand of the targets.
 
@@ -106,7 +108,9 @@ With random delay introduced, stale bids could arrive after fresh bids. Suppose 
 ## Scarcity Weighting: Results
 $k=0.1$ was chosen by varying $k$ over nine different values, running each auction on the same 2000 seeded instances (500 per agent/target setup). For each setup, the paired bootstrap 95% confidence interval does not include zero gain, indicating a statistically significant result. 
 
-![k sweep](experiments/docs/figures/k_sweep.png)
+<p align="center">
+  <img width="610" src="experiments/docs/figures/k_sweep.png" alt="k sweep">
+</p>
 
 To eliminate selection bias in the choice of $k$, the auction was run on 2000 new instances at $k = \{0.0, 0.1\}$. The summary is listed below:
 
