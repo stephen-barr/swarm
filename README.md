@@ -80,20 +80,22 @@ I aim to incrementally add uncertainty to a working implementation of the standa
 ## Assumptions (current)
  
 - Synchronous rounds over a static, connected, symmetric communication graph.
-- Drones learn which other drones exist only through the census; target positions and requirements are known to all.
-- One slot per drone.
-- Drones and targets are stationary; positions are in the global frame.
+- Agents learn which other drones exist only through the census; target positions and requirements are known to all.
+- Agents have 
+- One slot per agent.
+- Agents and targets are stationary; positions are in the global frame.
 - Demand is fixed at its most likely count before bidding.
 
 
 ## Scoring: time-discounted value
 
-Each drone scores a slot by the target's value, discounted by how long the drone would take to get there:
+Each agent scores a slot by the target's value, discounted by how when the agent would get there.
 
-$$\text{score} = V \cdot e^{-t/\tau}$$
+$$\text{score} = V \cdot e^{-(T_{now}+t_{arrival})/\tau}$$
 
 - **V** is the target's value to the mission (currently `threat_level`).
-- **t** is the drone's own time to arrival (distance ÷ cruise speed), so scores are local to each drone.
+- **T_{now}** is the agent's time at scoring.
+- **t_{arriva;}** is the drone's own time to arrival (distance ÷ cruise speed), so scores are local to each drone.
 - **τ** (tau) is a characteristic time: value halves every 0.69 τ seconds, so τ = 30 s means value halves roughly every 21 s.
 
 **Why this form**

@@ -54,13 +54,13 @@ def advance(spec: PlatformSpec, state: AgentState, accel_command: ThreeVector,
             new_bank)             # return the lateral acceleration based on the roll
 
         # find the new heading
-        phi_before = np.arctan2(
+        chi_before = np.arctan2(
             v[1], v[0]
         )                                                         # arctan to find current heading, returns back correct branch (counter-clockwise convention)
         omega = (a_lat / new_speed)                               # find rotational velocity
-        new_phi = phi_before + omega * dt                         # new heading
-        new_v = new_speed * np.array([np.cos(new_phi),
-                                      np.sin(new_phi), 0.0])      # new velocity
+        new_chi = chi_before + omega * dt                         # new heading
+        new_v = new_speed * np.array([np.cos(new_chi),
+                                      np.sin(new_chi), 0.0])      # new velocity
         new_x = x + new_v * dt                                    # new position
         pos_estimate = replace(state.estimate,
                                position=tuple(map(float, new_x)),
