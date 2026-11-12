@@ -2,15 +2,17 @@
 Generated demo: a mixed swarm runs a mission with runMission, then the replay is
 shown or saved.
 
-    python -m experiments.mission_demo                  # opens a window
-    python -m experiments.mission_demo --save mission.mp4
+    python -m sim.mission_demo                          # opens a window
+    python -m sim.mission_demo --save mission.mp4
+    python -m sim.mission_demo --seed 47 --agents 16 --targets 8 --compare --save cmp.gif
+        # --compare: scarcity off (k = 0) next to --k, same drones and targets, one clock
 """
 import argparse
 import random
 
 import matplotlib.pyplot as plt
 
-from sim.visualize import animateMission, saveAnimation
+from sim.visualize import animateComparison, animateMission, saveAnimation
 from swarm.auction import runMission
 from swarm.comms import Channel
 from swarm.models import Capability, MissionData, Payload, PlatformClass, role
@@ -59,22 +61,40 @@ def main():
     p.add_argument("--save",
                    default="",
                    help="output path (.mp4 or .gif); omit to show")
+    p.add_argument("--compare",
+                   action="store_true",
+                   help="show k = 0 next to --k on the same instance")
     args = p.parse_args()
 
-    agents, targets = build(args.seed, args.agents, args.targets, args.k)
-    mission = MissionData.fromTargets(targets)
-    channel = Channel[Payload](complete_graph(
-        [a.config.agent_id for a in agents]))
-    result = runMission(agents, channel, mission)
-    print(f"converged={result.converged}  agreement round={result.rounds}  "
-          f"completion={result.completion_time:.1f} s  filled={result.filled}")
+    def fly(k):
+        agents, targets = build(args.seed, args.agents, args.targets, k)
+        mission = MissionData.fromTargets(targets)
+        channel = Channel[Payload](complete_graph(
+            [a.config.agent_id for a in agents]))
+        result = runMission(agents, channel, mission)
+        print(
+            f"k={k}: converged={result.converged}  agreement round={result.rounds}  "
+            f"completion={result.completion_time:.1f} s  filled={result.filled}  "
+            f"total={result.total:.3f}")
+        return result, agents, mission
 
-    anim = animateMission(
-        result,
-        agents,
-        mission,
-        title=f"seed {args.seed}: {args.agents} drones, {args.targets} targets"
-    )
+    if args.compare:
+        runs = [fly(0.0), fly(args.k)]
+        anim = animateComparison(
+            [r for r, _, _ in runs], [a for _, a, _ in runs],
+            runs[0][2],
+            titles=["scarcity off (k = 0)", f"scarcity on (k = {args.k})"],
+            every=10,
+            suptitle=
+            f"seed {args.seed}: {args.agents} drones, {args.targets} targets")
+    else:
+        result, agents, mission = fly(args.k)
+        anim = animateMission(
+            result,
+            agents,
+            mission,
+            title=
+            f"seed {args.seed}: {args.agents} drones, {args.targets} targets")
     if args.save:
         saveAnimation(anim, args.save)
         print(f"wrote {args.save}")

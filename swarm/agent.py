@@ -37,11 +37,11 @@ from swarm.models import (
 
 class Agent:
 
-    def __init__(
-            self,
-            config: AgentConfig,
-            agent_position: PositionEstimate,
-            scarcity_k: float = 0.0):                                    # ensure consistency between measurements
+    def __init__(self,
+                 config: AgentConfig,
+                 agent_position: PositionEstimate,
+                 scarcity_k: float = 0.0,
+                 resend_period: int = 10):
         self.config = config
         if agent_position.frame is not Frame.GLOBAL:
             raise ValueError(
@@ -80,18 +80,22 @@ class Agent:
         self.latest_to_share: bool = True
 
         ### Timing
-        self.mission_time: float = 0.0      # how many seconds have elapsed since the beginning of the mission (auction start)
+        self.mission_time: float = 0.0                # how many seconds have elapsed since the beginning of the mission (auction start)
+        self.rounds_sent: int = 0                     # how many times have you transmitted, used for sending census and latest periodically
+        self.resend_period: int = resend_period       # how many normal rounds before including census and latest by default
 
         ### Loiter
         self.loiter_center: ThreeVector | None = None # in the instance you have no place to be, set a position to loiter around (important for fixed wing only)
 
     def outgoing(self) -> Payload:                                  # returns one payload per round
+        self.rounds_sent += 1
+        resend = self.rounds_sent % self.resend_period == 0         # are we resending the census and latest this period regardless
         census = None
-        if self.census_to_share:
+        if self.census_to_share or resend:
             census = self.census
             self.census_to_share = False                            # set flag for sharing census to False
         latest = None
-        if self.latest_to_share:
+        if self.latest_to_share or resend:
             latest = self.latest
             self.latest_to_share = False
         payload_to_be_sent: Payload = Payload(winners=self.winners,
