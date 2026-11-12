@@ -53,28 +53,37 @@ def loiterCommand(spec: PlatformSpec,
     if abs(direction) != 1:
         raise ValueError("Direction must be positive or negative one.")
     p = np.array(state.estimate.position[:2],
-                 dtype=float)                         # get x, y positions of agent, not considering z
+                 dtype=float)                                      # get x, y positions of agent, not considering z
     v = np.array(state.estimate.velocity[:2],
-                 dtype=float)                         # get velocity, not considering z
-    c = np.array(target_position[:2], dtype=float)    # x, y positions of target
-    r = p - c                                         # vector pointing from the target to the agent
-    dist = np.linalg.norm(r)                          # distance from agent to target
-    if dist < 1e-2:                                   # if within a centimeter, go east
+                 dtype=float)                                      # get velocity, not considering z
+    c = np.array(target_position[:2], dtype=float)                 # x, y positions of target
+    r = p - c                                                      # vector pointing from the target to the agent
+    dist = np.linalg.norm(r)                                       # distance from agent to target
+    if dist < 1e-2:                                                # if within a centimeter, go east
         r_hat = np.array([1.0, 0.0])
     else:
-        r_hat = r / dist                              # vector pointing out from target
+        r_hat = r / dist                                           # vector pointing out from target
     t_hat = direction * np.array([-r_hat[1], r_hat[0]
-                                  ])                  # vector directly tangent to circle
-    R = spec.loiter_radius                            # set a radius for the circle from specs
+                                  ])                               # vector directly tangent to circle
+    R = spec.loiter_radius                                         # set a radius for the circle from specs
     kappa = k * (
         dist - R
-    ) / R                                             # find the error from the path, positive on outside, negative on inside
-    u = t_hat - kappa * r_hat                         # go tangent to the circle, if kappa negative push out, if positive push in
-    v_des = spec.loiter_speed * u / np.linalg.norm(u) # renormalize the speed
-    v_tang = v @ t_hat                                # get the tangenetial part of velocity
+    ) / R                                                          # find the error from the path, positive on outside, negative on inside
+    u = t_hat - kappa * r_hat                                      # go tangent to the circle, if kappa negative push out, if positive push in
+    a_b = 0.8 * abs(spec.a_min)                                    # maximum braking at tolerance
+    speed = min(
+        spec.v_cruise,
+        np.sqrt(spec.loiter_speed**2 + 2 * a_b * max(dist - R, 0))
+    )                                                              # speed smoothly transforms from loiter speed to maximum braking speed to loiter speed
+    v_des = speed * u / np.linalg.norm(u)                          # renormalize the speed
+    v_tang = v @ t_hat                                             # get the tangenetial part of velocity
     a_ff = -(
         np.linalg.norm(v_tang)**2 / R
-    ) * r_hat                                         # feedforward acceleration needed so agent does not drift tangentially out.
-    a_fb = (v_des - v) / spec.tau                     # close the velocity error in char time tau
+    ) * r_hat                                                      # feedforward acceleration needed so agent does not drift tangentially out.
+    v_hat = v / np.linalg.norm(v)                                  # unit velocity vector
+    a_ff = a_ff - (
+        a_ff @ v_hat
+    ) * v_hat                                                      # remove the part of the feedforward term parallel to velocity
+    a_fb = (v_des - v) / spec.tau                                  # close the velocity error in char time tau
     a_cmd = a_ff + a_fb
     return (float(a_cmd[0]), float(a_cmd[1]), 0.0)
