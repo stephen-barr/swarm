@@ -1,7 +1,7 @@
 """
 Grid search for the scarcity weight k.
 
-Uses seeds 0..N-1.
+Uses seeds offset..offset+N-1 (offset 0 by default).
 Every k runs on the same drones/targets per instance, so comparisons between k are
 paired. Objective: raw score as % of Hungarian (higher is better).
 
@@ -11,6 +11,12 @@ the best k includes 0. Expect a plateau of near-best values, not a single winner
 Run from repo root:
     python -m experiments.k_sweep run --seeds 500
     python -m experiments.k_sweep analyze
+
+Fresh instances k was not tuned on, only k = 0 and 0.1:
+    python -u -m experiments.k_sweep run --seeds 500 --seed-offset 500 --ks 0 0.1 \
+        --results results/k_sweep_fresh.csv
+    python -m experiments.k_sweep analyze --results results/k_sweep_fresh.csv \
+        --figure results/k_sweep_fresh.png > results/k_sweep_fresh_summary.txt
 """
 import argparse
 import csv
@@ -71,8 +77,8 @@ def report_progress(done: int, total: int, start: float, every: int):
         flush=True)
 
 
-def run_instance(job: tuple[Cell, int]) -> list[dict]:
-    cell, seed = job
+def run_instance(job: tuple[Cell, int, list[float]]) -> list[dict]:
+    cell, seed, ks = job
 
     def instance(scarcity_k=0.0):
         return random_instance(seed=seed,
@@ -85,7 +91,7 @@ def run_instance(job: tuple[Cell, int]) -> list[dict]:
     if hungarian <= 0:
         return []
     rows = []
-    for k in KS:
+    for k in ks:
         result = solve(*instance(k), graph=GRAPHS[cell.graph])
         rows.append({
             **cell._asdict(), "seed": seed,
@@ -97,10 +103,14 @@ def run_instance(job: tuple[Cell, int]) -> list[dict]:
     return rows
 
 
-def run(seeds: int, out: str):
-    jobs = [(cell, seed) for cell in CELLS for seed in range(seeds)]
+def run(seeds: int, out: str, offset: int = 0, ks: list[float] = KS):
+    jobs = [(cell, seed, ks) for cell in CELLS
+            for seed in range(offset, offset + seeds)]
     start, every = time.time(), max(1, len(jobs) // 50)
-    print(f"running {len(jobs)} instances x {len(KS)} values of k", flush=True)
+    print(
+        f"running {len(jobs)} instances (seeds {offset}..{offset + seeds - 1}) "
+        f"x {len(ks)} values of k",
+        flush=True)
     with ProcessPoolExecutor() as pool, open(out, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()
@@ -149,15 +159,16 @@ def analyze(path: str, figure: str):
         def metric(k, name):
             return np.array([by_k[k][s][name] for s in seeds])
 
-        score = {k: metric(k, "pct_opt") for k in KS}
-        best = max(KS, key=lambda k: score[k].mean())
+        ks = sorted(by_k)         # the k values present in this file
+        score = {k: metric(k, "pct_opt") for k in ks}
+        best = max(ks, key=lambda k: score[k].mean())
 
         print(f"\n{cell.label()}  ({len(seeds)} instances)  best k = {best}")
         print(
             f"{'k':>6}{'% opt':>8}{'Δ vs best':>11}{'95% CI':>18}{'filled':>8}{'rounds':>8}  near-best"
         )
         curve = []
-        for k in KS:
+        for k in ks:
             diff = score[k] - score[best]
             lo, hi = bootstrap_ci(diff)
             ci = f"[{lo:.2f}, {hi:.2f}]"
@@ -167,6 +178,11 @@ def analyze(path: str, figure: str):
                 f"{metric(k, 'filled').mean():>8.2f}{metric(k, 'rounds').mean():>8.1f}  {near}"
             )
             curve.append((k, score[k].mean(), *bootstrap_ci(score[k])))
+        base = score[0.0].mean()
+        gaps = "  ".join(
+            f"k={k}: {(score[k].mean() - base) / (100 - base):.0%}" if base <
+            100 else f"k={k}: n/a" for k in ks if k > 0)
+        print(f"gap to optimal closed vs k = 0:  {gaps}")
         curves[cell] = curve
     plot(curves, figure)
 
@@ -208,12 +224,23 @@ def main():
                         type=int,
                         default=500,
                         help="tuning instances per cell")
+    parser.add_argument(
+        "--seed-offset",
+        type=int,
+        default=0,
+        help="first seed; use 500 for instances k was not tuned on")
+    parser.add_argument(
+        "--ks",
+        type=float,
+        nargs="+",
+        default=KS,
+        help="values of k to run (include 0 for the paired baseline)")
     parser.add_argument("--results", default=RESULTS)
     parser.add_argument("--figure", default=FIGURE)
     args = parser.parse_args()
 
     if args.command == "run":
-        run(args.seeds, args.results)
+        run(args.seeds, args.results, args.seed_offset, args.ks)
     else:
         analyze(args.results, args.figure)
 
