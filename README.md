@@ -1,9 +1,9 @@
-<!-- OUTLINE. Delete before committing. -->
-
 # Consensus-Based Decentralized Auctions for Heterogeneous Drone Swarms
 [![tests](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml/badge.svg)](https://github.com/stephen-barr/swarm/actions/workflows/tests.yml)
 
-![Mission replay](experiments/docs/figures/mission.gif)
+<p align="center">
+    <img width="610" src="experiments/docs/figures/mission.gif" alt="Mission replay">
+</p>
 
 This is a from-scratch Python implementation of decentralized task allocation for a heterogeneous drone swarm. The fundamental problem it aims to solve is as follows:
 
@@ -21,6 +21,8 @@ Such a question is of broad interest to the field of autonomous systems. Conside
 - Auctions give allocations between 95.4–99.3% of optimal on 800 instances of 6–48 agents.
 - The auction gives consistent allocation regardless of network topology with 1,600/1,600 ring and line topology instances consistent with the fully connected topology.
 - Scarcity weighting closes 22–37% of the gap to the globally-solved optimal allocation for 6–15% more rounds (assuming no information is known about other agents capabilities before the beginning of the auction) in 2,000 paired instances.
+- Under constant and random (reordered) message delay, every tested instance reaches consensus, after fixing a stale-bid bug that only appears with reordered delivery.
+- Agents fly to their assignment under realistic platform-specific limits. Auction occurs while agents move dynamically to targets or centroid of available slots they can act on.
 
 ## Overview
 The consensus-based auction algorithm (CBAA) is a decentralized method to reach agreement (or consensus) among independent agents only utilizing peer-to-peer communication. While, global solvers such as the Hungarian algorithm are provably optimal for assignment problems in polynomial time. CBAA provides the same assignment as a global greedy algorithm over agent/assignment pairings, which is provably within half of the optimal Hungarian assignment.
@@ -47,10 +49,11 @@ Notably, the value of a target halves every $0.69 \tau$. Some generic scores are
 
 
 ### Scarcity-Aware Bidding
-<figure>
-<img src=experiments/docs/figures/seed47_compare.gif alt="Scarcity Weighting">
-<figcaption> Scarcity weighting allows two extra slots to be filled, increasing score from 88% of optimal to 96% of optimal, at a cost of three seconds for further agent travel. </figcaption>
-</figure>
+  <p align="center">
+    <img width="900" src="experiments/docs/figures/seed47_compare.gif" alt="Scarcity weighting">
+    <br>
+    <em>Scarcity weighting allows two extra slots to be filled, increasing score from 88% of optimal to 96% of optimal, at a cost of three seconds for further agent travel.</em>
+  </p>
 
 In heterogeneous systems naive scoring does not account for the scarcity of a capability in a swarm relative to the demand of the targets.
 
@@ -58,7 +61,7 @@ In the naive case above, the auction completes with slots on target 4 (T4) and t
 
 Optimally, we would like agents to have some recognition of the scarcity of a given capability relative to the average slot. In addition, we would like this process to occur entirely decentralized. We propose the following solution:
 
-Agent's hold a local dictionary, `census`, which consists of agent_id's linked to a list of capabilities they hold. Peer-to-peer sharing includes this census (flagged) in its outbound message payload whenever its census increases from inbound messages and periodically (set by the attribute `resend_period`). 
+Agents hold a local dictionary, `census`, which consists of agent_id's linked to a list of capabilities they hold. Peer-to-peer sharing includes this census (flagged) in its outbound message payload whenever its census increases from inbound messages and periodically (set by the attribute `resend_period`). 
 
 This design allows for agents to have any varying degree of census information at the start of the mission, and for agents to be added mid mission even with packet loss (future implementation). Note that in ALL metrics given, we assume the worst case of no census information given. Thus the agent, must construct its census entirely from received messages. Preliminary evidence (120 instances per size) suggests no additional rounds compared to the naive scoring baseline.
 
@@ -69,7 +72,7 @@ The naive scoring generated from before is multiplied by an exponential of the r
 We consider the ratio of the number of agents able to fill a slot requiring some capability $r$, $n_r$, and the number of slots requiring $r$, $d_r$. This of course has units of agents/slots. To eliminate the units which become render comparison between missions inconsistent, this ratio is divided by the ratio of total agents to total slots. Thus, this pseudo-scarcity is given by
 $$a_r = \frac{n_r / d_r}{N / D},$$ with an important caveat: it is inverted relative to the idea of scarcity.
 
-$a_r$ is large when a slot has many agents available to bid on it, and small when it has few, thus we might refer to it as an *abundance* parameter (yes, I know, very clever).
+$a_r$ is large when a slot has many agents available to bid on it, and small when it has few, thus we might refer to it as an *abundance* parameter.
 
 The proper weighting of this scarcity weight is paramount; too small and the agents are not incentivized to give up closer targets, too great and all agents will go to the scarcest slots, completely disregarding the naive score. We determine this weighting $k$ from an empirical sweep over possible values. The full scarcity weighting formula is
 
@@ -80,7 +83,7 @@ and the full score of one slot is given by
 $$\text{score}_{scarce} = V e^{-(t/\tau + ka_r)} $$
 
 Considering the aforementioned census sharing during auctioning, each agents scarcity weighting at the start of the auction in the worst-case (no census information on other agents) is
-$$w_r = \exp\left( \frac{1 / d_r}{1/D} \right) = \exp\left( \frac{D}{d_r} \right),$$ which is the minimum of this weight as $n_r / N \leq 1$. Relating to the system, this acts as a penalty to more uncertain early bids, but creates rebidding and rescoring as drones increase their bids later, leading to marginally more rounds than other approaches.
+$$w_r = \exp\left(- k \frac{1 / d_r}{1/D} \right) = \exp\left(-k \frac{D}{d_r} \right),$$ which is the minimum of this weight as $n_r / N \leq 1$. Relating to the system, this acts as a penalty to more uncertain early bids, but creates rebidding and rescoring as drones increase their bids later, leading to marginally more rounds than other approaches.
 
 ### Versioned Bids
 Naive CBAA never requires agents to release previously held bids, as bids are required to monotonically decrease. The scarcity scoring introduces the need to release a bid that an agent holds as it learns of a rarer slot.
@@ -101,12 +104,14 @@ Version never updated when an agent was outbid. Suppose an agent $A$ makes an in
 2. **Out-of-order bids, November 3, commit 5dc0de7**
 With random delay introduced, stale bids could arrive after fresh bids. Suppose agent $A$ places bid (score = 0.5, version=3) on slot $S_1$; agent $B$ records this, changes `winners[S_1] = (0.5, v3)`and `latest[A.id] = 3`. Agent $A$ then bids on slot $S_2$ with (0.7, v4). The second bid, arrives to $B$ faster than the update to `latest`. $B$ updates `latest[A.id] = 4` but does not prune the previous bid `winners[S_1]`. Any subsequent bid lower than 0.5 on $S_1$ is rejected as it cannot beat the stale bid from $A$. 
 &nbsp;
-  The solution is to simply prune all entries in `winners` where the version is lower than the current version. Pretty simple.
+  The solution is to simply prune all entries in `winners` where the version is lower than the current version.
 
 ## Scarcity Weighting: Results
 $k=0.1$ was chosen by varying $k$ over ten different values, running each auction on the same 2000 seeded instances (500 per agent/target setup). For each setup, the paired bootstrap 95% confidence interval does not include zero gain, indicating a statistically significant result. 
 
-![k sweep](experiments/docs/figures/k_sweep.png)
+  <p align="center">
+    <img width="610" src="experiments/docs/figures/k_sweep.png" alt="k sweep">
+  </p>
 
 To eliminate selection bias in the choice of $k$, the auction was run on 2000 new instances at $k = \{0.0, 0.1\}$. The summary is listed below:
 
@@ -165,7 +170,7 @@ The guidance time constant $\tau_g$ is chosen so that $\tau_g  = \phi_{max}/{\do
  
 Fixed-wing agents orbit the target using vector-field path following (Beard & McLain, 2012). Their speed is given similarly by the minimum of cruise speed and the fastest braking speed down to the loiter speed, $v = \sqrt{v_{loiter}^2 + 2a_b(d-R)}$, using the same tolerance of $a_b = 0.8|a_{min}|$. The agents orbit their target at a radius of $R = 1.4\,v^2/a_{lat, max}$ and a speed of $1.25 v_{min}$; both margins were chosen rather than tuned.
 
-If the agent is unassigned, `agent.getDestination()` returns the centroid of slots open in the its table (targets with two open slots are counted twice). If no such slots exist, the method returns None, which is handled in `agent.step()` by loitering/hovering in place depending on the agent spec.
+If the agent is unassigned, `agent.getDestination()` returns the centroid of slots open in its table (targets with two open slots are counted twice). If no such slots exist, the method returns None, which is handled in `agent.step()` by loitering/hovering in place depending on the agent spec.
 
 
 ### Mission Loop and Visualizer
@@ -227,6 +232,12 @@ The visualizer (`sim/`) replays a recorded mission in matplotlib, with slots und
   Tests baselines (Hungarian, Greedy) do what they should.
 - *test_comm.py*
   Tests communication in channel
+- *test_latest.py*
+  Tests version tracking; stale and echoed bids are rejected and pruned.
+- *test_scarcity.py*
+  Tests scarcity weights and re-scoring as the census grows.
+- *test_guidance_dynamics.py*
+  Tests multirotor stopping, fixed-wing orbits and platform limits.
 
 ## Layout
 ```
